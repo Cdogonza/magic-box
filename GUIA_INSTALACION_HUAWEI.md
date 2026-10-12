@@ -57,7 +57,7 @@ termux-setup-storage
 Puedes comprimir la carpeta `magic-Box` en un archivo `.zip`, pasarla al celular por cable o Bluetooth, y descomprimirla. O clonar tu repositorio si lo subes a GitHub:
 
 ```bash
-git clone <URL_DE_TU_REPOSITORIO> magic-Box
+git clone https://github.com/Cdogonza/magic-box.git magic-Box
 cd magic-Box
 npm install
 node generate_sounds.js
