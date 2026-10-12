@@ -3,7 +3,7 @@
 # ========================================================
 
 # 1. Dependencias de Node.js
-node_modules/
+
 
 # 2. Sesión de WhatsApp (¡CRÍTICO: Seguridad y credenciales!)
 # Nunca debe subirse a un repositorio público ni privado
