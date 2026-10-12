@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Caja Mágica de Voces 🎙️✨</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Encabezado superior -->
+    <header class="app-header">
+      <div class="header-brand">
+        <span class="brand-icon">📦✨</span>
+        <div class="brand-text">
+          <h1>Caja Mágica</h1>
+          <p class="subtitle">Walkie-Talkie Familiar para Niños</p>
+        </div>
+      </div>
+      <div class="header-status">
+        <span id="connectionBadge" class="status-badge offline">
+          <span class="status-dot"></span>
+          <span id="connectionText">Desconectado</span>
+        </span>
+        <button id="btnSettings" class="btn-icon" title="Configuración">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Modal de Vinculación QR (si no está conectado) -->
+    <section id="qrSection" class="card qr-card hidden">
+      <div class="card-header">
+        <h2>📱 Vincula tu WhatsApp</h2>
+        <p>Abre WhatsApp en tu celular principal > Dispositivos vinculados > Vincular un dispositivo</p>
+      </div>
+      <div class="qr-wrapper">
+        <canvas id="qrCanvas"></canvas>
+        <div id="qrLoading" class="loading-spinner">Generando código...</div>
+      </div>
+      <p class="qr-hint">Se conectará automáticamente en cuanto lo escanees.</p>
+    </section>
+
+    <!-- PANTALLA PRINCIPAL DE LA CAJA (2 BOTONES GIGANTES) -->
+    <main class="main-box-controls">
+      <div class="status-banner" id="statusBanner">
+        <span id="statusIcon">🔔</span>
+        <span id="statusMessage">Caja lista para jugar</span>
+      </div>
+
+      <div class="buttons-grid">
+        <!-- BOTÓN VERDE: ESCUCHAR -->
+        <button id="btnListen" class="giant-btn btn-listen" type="button">
+          <div class="btn-glow"></div>
+          <div class="btn-inner">
+            <span class="btn-emoji">👂</span>
+            <span class="btn-title">ESCUCHAR</span>
+            <span class="btn-sub" id="unreadBadgeText">No hay audios nuevos</span>
+          </div>
+        </button>
+
+        <!-- BOTÓN ROJO: HABLAR -->
+        <button id="btnRecord" class="giant-btn btn-record" type="button">
+          <div class="btn-glow"></div>
+          <div class="btn-inner">
+            <span class="btn-emoji" id="recordEmoji">🎙️</span>
+            <span class="btn-title" id="recordTitle">HABLAR</span>
+            <span class="btn-sub" id="recordSub">Mantén presionado</span>
+          </div>
+          <!-- Onda animada de voz cuando graba -->
+          <div class="sound-waves hidden" id="soundWaves">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </button>
+      </div>
+    </main>
+
+    <!-- BUZÓN DE MENSAJES RECIBIDOS -->
+    <section class="inbox-section card">
+      <div class="inbox-header">
+        <h3>📬 Buzón de Mensajes</h3>
+        <span class="badge-count" id="audioCountBadge">0 audios</span>
+      </div>
+      <div class="audio-list" id="audioList">
+        <div class="empty-inbox">No han llegado audios todavía. Los audios de la familia aparecerán aquí.</div>
+      </div>
+    </section>
+
+    <!-- MODAL DE AJUSTES -->
+    <div id="settingsModal" class="modal hidden">
+      <div class="modal-content card">
+        <div class="modal-header">
+          <h3>⚙️ Configuración de la Caja</h3>
+          <button id="btnCloseSettings" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="selectGroup">Grupo Familiar de WhatsApp:</label>
+            <select id="selectGroup">
+              <option value="">-- Selecciona el grupo familiar --</option>
+            </select>
+            <small>Solo se escucharán y enviarán audios a este grupo.</small>
+          </div>
+
+          <div class="form-group">
+            <label for="buttonMode">Modo de los botones:</label>
+            <select id="buttonMode">
+              <option value="hold">Mantener presionado para hablar (Walkie-Talkie)</option>
+              <option value="toggle">1 toque empieza, 1 toque envía (Recomendado para 5 años)</option>
+            </select>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label>
+              <input type="checkbox" id="autoPlayCheckbox">
+              Reproducir audios inmediatamente al llegar
+            </label>
+          </div>
+
+          <div class="form-group">
+            <button id="btnSaveConfig" class="btn-primary">Guardar Cambios</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

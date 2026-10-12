@@ -1,0 +1,9 @@
+{
+  "targetGroupName": "prueba",
+  "targetGroupId": "120363413367941258@g.us",
+  "buttonMode": "toggle",
+  "minRecordDurationSeconds": 1.2,
+  "autoPlayNewMessages": false,
+  "port": 3000,
+  "volume": 100
+}
