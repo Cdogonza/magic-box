@@ -19,6 +19,7 @@ const statusMessage = document.getElementById('statusMessage');
 
 const btnListen = document.getElementById('btnListen');
 const unreadBadgeText = document.getElementById('unreadBadgeText');
+const listenEmoji = document.getElementById('listenEmoji');
 
 const btnRecord = document.getElementById('btnRecord');
 const recordEmoji = document.getElementById('recordEmoji');
@@ -101,6 +102,15 @@ function handleSocketMessage(msg) {
     case 'new-message':
       showStatus(`🔔 ¡Nuevo mensaje de ${msg.sender}!`, '🎉');
       webSounds.ding.play().catch(() => {});
+      if (msg.unreadCount !== undefined) {
+        updateGreenLight(msg.unreadCount);
+      }
+      loadAudios();
+      break;
+    case 'unread-update':
+      if (msg.unreadCount !== undefined) {
+        updateGreenLight(msg.unreadCount);
+      }
       loadAudios();
       break;
     case 'groups':
@@ -141,19 +151,34 @@ function showStatus(text, icon = 'ℹ️') {
   statusIcon.textContent = icon;
 }
 
+// Control del estado de la LUZ VERDE (Botón Escuchar)
+function updateGreenLight(unreadCount) {
+  state.unreadCount = unreadCount;
+  if (unreadCount > 0) {
+    btnListen.classList.add('is-lit');
+    if (listenEmoji) listenEmoji.textContent = '🔔';
+    unreadBadgeText.textContent = `${unreadCount} nuevo(s) por escuchar`;
+  } else {
+    btnListen.classList.remove('is-lit');
+    if (listenEmoji) listenEmoji.textContent = '👂';
+    unreadBadgeText.textContent = 'Buzón al día • Sin audios';
+  }
+}
+
+// Control del estado de la LUZ ROJA (Botón Hablar)
 function setRecordingUI(isRecording) {
   state.isRecording = isRecording;
   if (isRecording) {
-    btnRecord.classList.add('recording');
+    btnRecord.classList.add('is-lit', 'recording');
     recordTitle.textContent = 'GRABANDO...';
     recordSub.textContent = state.buttonMode === 'hold' ? 'Suelta para enviar' : 'Toca para enviar';
     recordEmoji.textContent = '🔴';
     soundWaves.classList.remove('hidden');
-    showStatus('¡Habla ahora! Tu voz se está grabando...', '🎙️');
+    showStatus('¡Luz roja encendida! Grabando tu voz...', '🎙️');
   } else {
-    btnRecord.classList.remove('recording');
+    btnRecord.classList.remove('is-lit', 'recording');
     recordTitle.textContent = 'HABLAR';
-    recordSub.textContent = state.buttonMode === 'hold' ? 'Mantén presionado' : 'Toca para hablar';
+    recordSub.textContent = state.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
     recordEmoji.textContent = '🎙️';
     soundWaves.classList.add('hidden');
   }
@@ -181,6 +206,8 @@ async function loadStatus() {
     }
     state.config = data.config || {};
     applyConfigUI(state.config);
+    updateGreenLight(data.unreadCount || 0);
+    setRecordingUI(data.isRecording || false);
     loadAudios();
     loadGroups();
   } catch (err) {
@@ -192,7 +219,7 @@ function applyConfigUI(cfg) {
   if (cfg.buttonMode) {
     state.buttonMode = cfg.buttonMode;
     buttonModeSelect.value = cfg.buttonMode;
-    recordSub.textContent = cfg.buttonMode === 'hold' ? 'Mantén presionado' : 'Toca para hablar';
+    recordSub.textContent = cfg.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
   }
   if (cfg.targetGroupId) {
     selectGroup.value = cfg.targetGroupId;
@@ -230,7 +257,7 @@ async function loadAudios() {
     const audios = await res.json();
     audioCountBadge.textContent = `${audios.length} audios`;
     const unread = audios.filter(a => !a.isRead).length;
-    unreadBadgeText.textContent = unread > 0 ? `${unread} nuevo(s) sin escuchar` : 'Repetir último audio';
+    updateGreenLight(unread);
 
     if (audios.length === 0) {
       audioList.innerHTML = '<div class="empty-inbox">No han llegado audios todavía. Los audios de la familia aparecerán aquí.</div>';
@@ -306,6 +333,11 @@ btnListen.addEventListener('click', async () => {
     const data = await res.json();
 
     if (data.played && data.played.url) {
+      if (data.unreadCount !== undefined) {
+        updateGreenLight(data.unreadCount);
+      } else {
+        loadAudios();
+      }
       // Reproducir en el navegador de principio a fin sin cortes
       playAudioFile(data.played.url);
     } else {
@@ -501,6 +533,23 @@ btnSaveConfig.addEventListener('click', async () => {
     alert('Error guardando configuración');
   }
 });
+
+const btnRelink = document.getElementById('btnRelink');
+if (btnRelink) {
+  btnRelink.addEventListener('click', async () => {
+    if (confirm('¿Quieres desvincular la sesión actual para escanear con un número nuevo?')) {
+      settingsModal.classList.add('hidden');
+      showStatus('Generando nuevo código QR...', '⏳');
+      qrSection.classList.remove('hidden');
+      qrLoading.classList.remove('hidden');
+      try {
+        await fetch('/api/logout', { method: 'POST' });
+      } catch (e) {
+        console.error('Error al desvincular:', e);
+      }
+    }
+  });
+}
 
 // Inicialización
 connectWebSocket();

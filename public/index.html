@@ -53,20 +53,22 @@
         <!-- BOTÓN VERDE: ESCUCHAR -->
         <button id="btnListen" class="giant-btn btn-listen" type="button">
           <div class="btn-glow"></div>
+          <div class="light-indicator" id="greenLightIndicator"></div>
           <div class="btn-inner">
-            <span class="btn-emoji">👂</span>
+            <span class="btn-emoji" id="listenEmoji">👂</span>
             <span class="btn-title">ESCUCHAR</span>
-            <span class="btn-sub" id="unreadBadgeText">No hay audios nuevos</span>
+            <span class="btn-sub" id="unreadBadgeText">Buzón al día</span>
           </div>
         </button>
 
         <!-- BOTÓN ROJO: HABLAR -->
         <button id="btnRecord" class="giant-btn btn-record" type="button">
           <div class="btn-glow"></div>
+          <div class="light-indicator" id="redLightIndicator"></div>
           <div class="btn-inner">
             <span class="btn-emoji" id="recordEmoji">🎙️</span>
             <span class="btn-title" id="recordTitle">HABLAR</span>
-            <span class="btn-sub" id="recordSub">Mantén presionado</span>
+            <span class="btn-sub" id="recordSub">Toca para hablar</span>
           </div>
           <!-- Onda animada de voz cuando graba -->
           <div class="sound-waves hidden" id="soundWaves">
@@ -120,6 +122,12 @@
 
           <div class="form-group">
             <button id="btnSaveConfig" class="btn-primary">Guardar Cambios</button>
+          </div>
+
+          <div class="form-group" style="margin-top: 14px; border-top: 1px dashed var(--border-card); padding-top: 14px;">
+            <button id="btnRelink" type="button" style="width: 100%; padding: 10px; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.4); border-radius: var(--radius-sm); color: #fecdd3; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+              🔄 Vincular otro número de teléfono (Cerrar sesión)
+            </button>
           </div>
         </div>
       </div>

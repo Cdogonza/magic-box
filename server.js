@@ -76,7 +76,10 @@ whatsapp.on('ready', async (data) => {
 
 whatsapp.on('voice-message', async (data) => {
   console.log(`[Caja] 🔔 ¡Nuevo mensaje de ${data.sender}! Haciendo sonar campana...`);
-  broadcast('new-message', data);
+  const audios = audio.getReceivedAudios();
+  const unreadCount = audios.filter(a => !a.isRead).length;
+  broadcast('new-message', { ...data, unreadCount });
+  broadcast('unread-update', { unreadCount });
 
   // Reproducir campana mágica de nuevo mensaje
   await audio.playSoundEffect('ding');
@@ -85,6 +88,8 @@ whatsapp.on('voice-message', async (data) => {
   if (config.autoPlayNewMessages) {
     setTimeout(async () => {
       await audio.playNextOrLast(false);
+      const afterAudios = audio.getReceivedAudios();
+      broadcast('unread-update', { unreadCount: afterAudios.filter(a => !a.isRead).length });
     }, 1200);
   }
 });
@@ -126,6 +131,16 @@ app.get('/api/audios', (req, res) => {
   res.json(audio.getReceivedAudios());
 });
 
+app.post('/api/logout', async (req, res) => {
+  try {
+    console.log('[WhatsApp] Cierre de sesión solicitado desde la interfaz web');
+    await whatsapp.logout();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // BOTÓN 1: ESCUCHAR
 app.post('/api/btn/listen', async (req, res) => {
   try {
@@ -133,7 +148,10 @@ app.post('/api/btn/listen', async (req, res) => {
     console.log(`[Botón] 🟢 Presionado: ESCUCHAR (Origen: ${isWeb ? 'Navegador Web' : 'Físico / Terminal'})`);
     // Si la llamada viene del navegador, el navegador se encargará de reproducir el audio con HTML5 Audio
     const played = await audio.playNextOrLast(isWeb);
-    res.json({ success: true, played });
+    const audios = audio.getReceivedAudios();
+    const unreadCount = audios.filter(a => !a.isRead).length;
+    broadcast('unread-update', { unreadCount });
+    res.json({ success: true, played, unreadCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -220,33 +238,35 @@ app.post('/api/upload-voice', express.raw({ type: '*/*', limit: '15mb' }), async
 
 // Soporte de Teclado Interactivo en la Terminal (para pruebas en PC o Termux)
 if (process.stdin.isTTY) {
-  readline.emitKeypressEvents(process.stdin);
   try {
+    readline.emitKeypressEvents(process.stdin);
     process.stdin.setRawMode(true);
-  } catch (e) {}
+    process.stdin.resume();
 
-  console.log('\n🎮 ATAJOS DE TECLADO EN TERMINAL ACTIVADOS:');
-  console.log('  [E] -> Botón Verde: Escuchar último audio');
-  console.log('  [G] -> Botón Rojo: Grabar (1 toque empieza, 1 toque envía)');
-  console.log('  [Q] -> Salir\n');
+    console.log('\n🎮 ATAJOS DE TECLADO EN TERMINAL ACTIVADOS:');
+    console.log('  [E] -> Botón Verde: Escuchar último audio');
+    console.log('  [G] / [Espacio] -> Botón Rojo: Grabar');
+    console.log('  [Ctrl+C] -> Salir\n');
 
-  process.stdin.on('keypress', async (str, key) => {
-    if (key.ctrl && key.name === 'c') process.exit();
-    if (key.name === 'q') process.exit();
+    process.stdin.on('keypress', async (str, key) => {
+      if (key && key.ctrl && key.name === 'c') process.exit();
 
-    if (key.name === 'e') {
-      await audio.playNextOrLast(false);
-    } else if (key.name === 'g' || key.name === 'space') {
-      if (audio.isRecording) {
-        const file = await audio.stopRecording();
-        if (file && whatsapp.isConnected) {
-          await whatsapp.sendVoiceNote(file);
+      if (key && key.name === 'e') {
+        await audio.playNextOrLast(false);
+      } else if (key && (key.name === 'g' || key.name === 'space')) {
+        if (audio.isRecording) {
+          const file = await audio.stopRecording();
+          if (file && whatsapp.isConnected) {
+            await whatsapp.sendVoiceNote(file);
+          }
+        } else {
+          await audio.startRecording();
         }
-      } else {
-        await audio.startRecording();
       }
-    }
-  });
+    });
+  } catch (e) {
+    console.warn('Modo TTY no disponible para atajos de terminal');
+  }
 }
 
 // Iniciar servidor
