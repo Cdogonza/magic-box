@@ -668,6 +668,25 @@ btnSaveConfig.addEventListener('click', async () => {
   }
 });
 
+const btnClearAudios = document.getElementById('btnClearAudios');
+if (btnClearAudios) {
+  btnClearAudios.addEventListener('click', async () => {
+    if (confirm('¿Vaciar todos los audios recibidos del buzón? Esto borrará los audios antiguos y apagará la luz verde.')) {
+      try {
+        const res = await fetch('/api/audios/clear', { method: 'POST' });
+        if (res.ok) {
+          settingsModal.classList.add('hidden');
+          showStatus('Buzón de audios vaciado', '🧹');
+          updateGreenLight(0);
+          loadAudios();
+        }
+      } catch (e) {
+        alert('Error al vaciar buzón');
+      }
+    }
+  });
+}
+
 const btnRelink = document.getElementById('btnRelink');
 if (btnRelink) {
   btnRelink.addEventListener('click', async () => {

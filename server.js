@@ -174,6 +174,16 @@ app.get('/api/audios', (req, res) => {
   res.json(audio.getReceivedAudios());
 });
 
+app.post('/api/audios/clear', (req, res) => {
+  try {
+    const deletedCount = audio.clearAudios();
+    broadcast('unread-update', { unreadCount: 0 });
+    res.json({ success: true, deletedCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/logout', async (req, res) => {
   try {
     console.log('[WhatsApp] Cierre de sesión solicitado desde la interfaz web');
