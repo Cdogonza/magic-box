@@ -158,11 +158,14 @@ function showStatus(text, icon = 'ℹ️') {
 
 // Control del estado de la LUZ VERDE (Botón Escuchar)
 function updateGreenLight(unreadCount) {
-  state.unreadCount = unreadCount;
-  if (unreadCount > 0) {
+  state.unreadCount = unreadCount !== undefined ? unreadCount : (state.unreadCount || 0);
+  const isLit = state.unreadCount > 0 || state.isPlaying;
+  if (isLit) {
     btnListen.classList.add('is-lit');
     if (listenEmoji) listenEmoji.textContent = '🔔';
-    unreadBadgeText.textContent = `${unreadCount} nuevo(s) por escuchar`;
+    unreadBadgeText.textContent = state.isPlaying
+      ? 'Reproduciendo audio...'
+      : `${state.unreadCount} nuevo(s) por escuchar`;
   } else {
     btnListen.classList.remove('is-lit');
     if (listenEmoji) listenEmoji.textContent = '👂';
@@ -192,10 +195,13 @@ function setRecordingUI(isRecording) {
 function setPlayingUI(isPlaying) {
   state.isPlaying = isPlaying;
   if (isPlaying) {
-    btnListen.classList.add('pressed');
+    btnListen.classList.add('pressed', 'is-lit');
     showStatus('Reproduciendo mensaje de la familia...', '🔊');
+    if (listenEmoji) listenEmoji.textContent = '🔊';
+    unreadBadgeText.textContent = 'Reproduciendo audio...';
   } else {
     btnListen.classList.remove('pressed');
+    updateGreenLight(state.unreadCount || 0);
     showStatus('Caja lista para jugar', '✨');
   }
 }
@@ -213,6 +219,9 @@ async function loadStatus() {
     applyConfigUI(state.config);
     updateGreenLight(data.unreadCount || 0);
     setRecordingUI(data.isRecording || false);
+    if (data.ffmpegAvailable === false) {
+      showStatus('⚠️ FFmpeg requiere actualización en Termux: corre pkg upgrade', '⚙️');
+    }
     loadAudios();
     loadGroups();
   } catch (err) {
@@ -297,62 +306,181 @@ async function loadAudios() {
   }
 }
 
-// Reproducir audio completo sin cortes en el navegador
-function playAudioFile(audioUrl) {
+// AudioContext para desbloqueo móvil y fallback de decodificación
+let audioCtx = null;
+let currentWebAudioSource = null;
+let playbackWatchdog = null;
+
+function getAudioContext() {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      audioCtx = new AudioContextClass();
+    }
+  }
+  return audioCtx;
+}
+
+function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
+function stopCurrentPlayback() {
+  if (playbackWatchdog) {
+    clearTimeout(playbackWatchdog);
+    playbackWatchdog = null;
+  }
   if (currentAudioPlayer) {
-    currentAudioPlayer.pause();
+    try {
+      currentAudioPlayer.pause();
+      currentAudioPlayer.removeAttribute('src');
+      currentAudioPlayer.load();
+    } catch (e) {}
     currentAudioPlayer = null;
   }
+  if (currentWebAudioSource) {
+    try {
+      currentWebAudioSource.stop();
+    } catch (e) {}
+    currentWebAudioSource = null;
+  }
+}
 
+// Reproducción alternativa mediante Web Audio API si HTML5 Audio se cuelga con Opus/Ogg
+async function playWithWebAudio(audioUrl, onEnded) {
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+
+  try {
+    if (ctx.state === 'suspended') await ctx.resume();
+    showStatus('Decodificando audio...', '🔊');
+
+    const res = await fetch(audioUrl);
+    if (!res.ok) return false;
+    const arrayBuf = await res.arrayBuffer();
+    const audioBuf = await ctx.decodeAudioData(arrayBuf);
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuf;
+    source.connect(ctx.destination);
+    currentWebAudioSource = source;
+
+    source.onended = () => {
+      currentWebAudioSource = null;
+      if (onEnded) onEnded();
+    };
+
+    source.start(0);
+    return true;
+  } catch (err) {
+    console.error('[WebAudio] Fallback falló:', err);
+    return false;
+  }
+}
+
+// Reproducir audio completo sin cortes en el navegador
+async function playAudioFile(audioUrl) {
+  stopCurrentPlayback();
   setPlayingUI(true);
-  const audio = new Audio(audioUrl);
-  currentAudioPlayer = audio;
 
-  audio.onended = () => {
+  // Watchdog de seguridad absoluto: Si en 25s no terminó, liberar la interfaz
+  playbackWatchdog = setTimeout(() => {
+    console.warn('[Audio] Watchdog: Tiempo límite alcanzado, restaurando UI.');
+    stopCurrentPlayback();
     setPlayingUI(false);
-    currentAudioPlayer = null;
+  }, 25000);
+
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    stopCurrentPlayback();
+    setPlayingUI(false);
     loadAudios();
   };
 
-  audio.onerror = (err) => {
-    console.error('Error reproduciendo audio:', err);
-    setPlayingUI(false);
-    currentAudioPlayer = null;
+  const audio = new Audio();
+  currentAudioPlayer = audio;
+  audio.preload = 'auto';
+
+  audio.onended = () => {
+    finish();
   };
 
-  audio.play().catch(e => {
-    console.error('No se pudo reproducir:', e);
-    setPlayingUI(false);
-  });
+  audio.onloadedmetadata = () => {
+    if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+      clearTimeout(playbackWatchdog);
+      const safeTime = Math.max(5000, (audio.duration + 4) * 1000);
+      playbackWatchdog = setTimeout(() => {
+        console.warn('[Audio] Watchdog: Duración superada.');
+        finish();
+      }, safeTime);
+    }
+  };
+
+  audio.onerror = async (err) => {
+    console.warn('[Audio] HTML5 Audio falló, probando fallback Web Audio:', err);
+    const ok = await playWithWebAudio(audioUrl, finish);
+    if (!ok) {
+      showStatus('No se pudo reproducir este audio', '⚠️');
+      finish();
+    }
+  };
+
+  audio.src = audioUrl;
+
+  try {
+    await audio.play();
+  } catch (playErr) {
+    console.warn('[Audio] .play() bloqueado o falló, probando fallback Web Audio:', playErr);
+    const ok = await playWithWebAudio(audioUrl, finish);
+    if (!ok) {
+      showStatus('Error de reproducción en el navegador', '⚠️');
+      finish();
+    }
+  }
 }
 
 // ==========================================
 // ACCIÓN BOTÓN VERDE: ESCUCHAR
 // ==========================================
-btnListen.addEventListener('click', async () => {
+async function handleListenAction() {
+  unlockAudio();
   btnListen.classList.add('pressed');
-  setTimeout(() => btnListen.classList.remove('pressed'), 200);
 
   try {
+    showStatus('Buscando mensajes nuevos...', '⏳');
     const res = await fetch('/api/btn/listen?source=web', { method: 'POST' });
     const data = await res.json();
 
     if (data.played && data.played.url) {
       if (data.unreadCount !== undefined) {
-        updateGreenLight(data.unreadCount);
-      } else {
-        loadAudios();
+        state.unreadCount = data.unreadCount;
       }
-      // Reproducir en el navegador de principio a fin sin cortes
-      playAudioFile(data.played.url);
+      await playAudioFile(data.played.url);
     } else {
-      // Buzón vacío
+      btnListen.classList.remove('pressed');
       webSounds.empty.play().catch(() => {});
       showStatus('No hay mensajes nuevos en la caja', '📭');
     }
   } catch (e) {
     console.error('Error al escuchar:', e);
+    btnListen.classList.remove('pressed');
+    setPlayingUI(false);
+    showStatus('Error de conexión', '❌');
   }
+}
+
+btnListen.addEventListener('click', () => {
+  handleListenAction();
+});
+
+btnListen.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  handleListenAction();
 });
 
 // ==========================================
@@ -418,11 +546,11 @@ async function startRecording() {
           webSounds.sent.play().catch(() => {});
           showStatus('¡Audio enviado a la familia con éxito! 🎉', '✅');
         } else {
-          showStatus('No se pudo enviar. Revisa la conexión de WhatsApp.', '❌');
+          showStatus(uploadData.error || 'No se pudo enviar. Revisa la conexión de WhatsApp o FFmpeg.', '❌');
         }
       } catch (err) {
         console.error('Error subiendo audio:', err);
-        showStatus('Error de conexión al enviar audio', '❌');
+        showStatus('Error al enviar audio: ' + (err.message || 'conexión'), '❌');
       }
     };
 
@@ -471,6 +599,7 @@ btnRecord.addEventListener('mouseleave', () => {
 
 btnRecord.addEventListener('touchstart', (e) => {
   e.preventDefault();
+  unlockAudio();
   handleRecordTrigger();
 });
 

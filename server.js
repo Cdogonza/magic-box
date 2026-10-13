@@ -82,6 +82,13 @@ whatsapp.on('ready', async (data) => {
   broadcast('ready', data);
   const groups = await whatsapp.getGroupsList();
   broadcast('groups', { groups });
+
+  // Convertir audios pendientes a MP3 para óptima reproducción en navegadores
+  try {
+    if (await whatsapp.isFfmpegAvailable()) {
+      await audio.ensureMp3Conversion(whatsapp.getFfmpegBinary());
+    }
+  } catch (e) {}
 });
 
 whatsapp.on('voice-message', async (data) => {
@@ -118,6 +125,7 @@ app.get('/api/status', async (req, res) => {
       qrDataUrl = await QRCode.toDataURL(whatsapp.qrCode, { margin: 1, width: 300 });
     } catch (e) {}
   }
+  const ffmpegAvailable = await whatsapp.isFfmpegAvailable();
   res.json({
     connected: whatsapp.isConnected,
     user: whatsapp.sock?.user || null,
@@ -127,6 +135,7 @@ app.get('/api/status', async (req, res) => {
     isPlaying: audio.isPlaying,
     receivedCount: audios.length,
     unreadCount: audios.filter(a => !a.isRead).length,
+    ffmpegAvailable,
     config
   });
 });
@@ -250,23 +259,28 @@ app.post('/api/upload-voice', express.raw({ type: '*/*', limit: '15mb' }), async
     }
 
     console.log(`[Caja] 🎙️ Recibido audio desde navegador (${req.body.length} bytes)`);
-    const tempPath = path.join(__dirname, 'data', 'recordings', `web_${Date.now()}.raw`);
-    fs.writeFileSync(tempPath, req.body);
+    const contentType = req.headers['content-type'] || '';
+    let ext = '.webm';
+    if (contentType.includes('ogg')) ext = '.ogg';
+    else if (contentType.includes('mp4') || contentType.includes('m4a')) ext = '.mp4';
+    else if (contentType.includes('wav')) ext = '.wav';
 
-    // Suena el efecto de envío
-    await audio.playSoundEffect('sent');
+    const tempPath = path.join(__dirname, 'data', 'recordings', `web_${Date.now()}${ext}`);
+    fs.writeFileSync(tempPath, req.body);
 
     if (whatsapp.isConnected) {
       await whatsapp.sendVoiceNote(tempPath);
+      // Suena el efecto de envío tras confirmación
+      await audio.playSoundEffect('sent');
       console.log('✓ Audio enviado exitosamente a WhatsApp desde el navegador!');
       res.json({ success: true, sent: true });
     } else {
       console.warn('[Caja] WhatsApp no está conectado actualmente');
-      res.json({ success: true, sent: false, reason: 'offline' });
+      res.status(503).json({ success: false, sent: false, error: 'WhatsApp no está conectado actualmente' });
     }
   } catch (err) {
-    console.error('Error enviando audio desde web:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Error enviando audio desde web:', err.message);
+    res.status(500).json({ success: false, sent: false, error: err.message });
   }
 });
 

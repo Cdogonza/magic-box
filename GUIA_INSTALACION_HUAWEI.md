@@ -36,18 +36,24 @@ Los teléfonos Huawei tienen un sistema de ahorro de batería muy agresivo que a
 
 ## 3. Instalar Paquetes Necesarios en Termux
 
-Abre **Termux** y escribe estos comandos uno por uno (presiona Enter):
+Abre **Termux** y escribe estos comandos (es muy importante hacer `pkg upgrade` para evitar desincronización de librerías como `libplacebo` / `ffmpeg`):
 
 ```bash
 pkg update -y
-pkg install -y nodejs-lts ffmpeg termux-api git
+pkg upgrade -y
+pkg install -y nodejs-lts ffmpeg mpv termux-api git
 ```
+*(Si durante `pkg upgrade` te pregunta sobre archivos de configuración, simplemente presiona **Enter** para aceptar el valor predeterminado).*
 
 Concede los permisos de almacenamiento y micrófono a Termux:
 ```bash
 termux-setup-storage
 ```
 *(Acepta la ventana emergente en la pantalla del celular).*
+
+> 💡 **Solución si FFmpeg falla con error de `libplacebo.so` o `CANNOT LINK EXECUTABLE`:**  
+> En Termux esto ocurre cuando se instala un paquete sin haber actualizado las librerías base de C++. Se soluciona ejecutando en Termux:  
+> `pkg update -y && pkg upgrade -y && pkg install -y ffmpeg mpv`
 
 ---
 
