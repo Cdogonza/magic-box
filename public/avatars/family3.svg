@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="skin3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fed7aa"/>
+      <stop offset="100%" stop-color="#fdba74"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="56" fill="url(#bg3)" stroke="#ffedd5" stroke-width="4"/>
+  
+  <!-- Left Character: Abuelo with Beret/Flat cap -->
+  <g transform="translate(18, 20)">
+    <!-- Flat Cap -->
+    <path d="M 6 16 C 6 10 20 6 34 10 C 40 12 42 16 38 18 C 30 18 10 18 6 16 Z" fill="#64748b"/>
+    <ellipse cx="23" cy="13" rx="16" ry="6" fill="#475569"/>
+    <!-- Head -->
+    <ellipse cx="22" cy="26" rx="13" ry="14" fill="url(#skin3)"/>
+    <!-- Smiling Eyes -->
+    <path d="M 14 24 Q 17 21 20 24" stroke="#1e293b" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M 24 24 Q 27 21 30 24" stroke="#1e293b" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Cheerful big smile -->
+    <path d="M 17 31 Q 22 37 27 31" stroke="#9a3412" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Cheeks -->
+    <circle cx="13" cy="28" r="2.5" fill="#fca5a5" opacity="0.6"/>
+    <circle cx="31" cy="28" r="2.5" fill="#fca5a5" opacity="0.6"/>
+    <!-- Body -->
+    <path d="M 6 42 C 6 36 14 36 22 36 C 30 36 38 36 38 42 L 40 58 L 4 58 Z" fill="#ca8a04"/>
+  </g>
+
+  <!-- Right Character: Abuela with Curly silver hair and scarf -->
+  <g transform="translate(56, 20)">
+    <!-- Curly silver hair circles -->
+    <circle cx="14" cy="14" r="6" fill="#e2e8f0"/>
+    <circle cx="23" cy="10" r="6" fill="#e2e8f0"/>
+    <circle cx="32" cy="14" r="6" fill="#e2e8f0"/>
+    <circle cx="11" cy="22" r="5" fill="#e2e8f0"/>
+    <circle cx="35" cy="22" r="5" fill="#e2e8f0"/>
+    <!-- Head -->
+    <ellipse cx="23" cy="26" rx="12" ry="13" fill="url(#skin3)"/>
+    <!-- Smiling Eyes -->
+    <path d="M 16 25 Q 19 22 22 25" stroke="#1e293b" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M 24 25 Q 27 22 30 25" stroke="#1e293b" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Smile -->
+    <path d="M 19 32 Q 23 37 27 32" stroke="#9a3412" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Cheeks -->
+    <circle cx="14" cy="29" r="2.5" fill="#fca5a5" opacity="0.7"/>
+    <circle cx="32" cy="29" r="2.5" fill="#fca5a5" opacity="0.7"/>
+    <!-- Cozy Pink Scarf & Body -->
+    <path d="M 10 41 C 10 36 16 36 23 36 C 30 36 36 36 36 41 L 38 58 L 8 58 Z" fill="#db2777"/>
+    <path d="M 16 37 Q 23 42 30 37 Q 23 45 16 37 Z" fill="#f472b6"/>
+  </g>
+</svg>

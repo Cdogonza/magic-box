@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="skin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fed7aa"/>
+      <stop offset="100%" stop-color="#fdba74"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="56" fill="url(#bg1)" stroke="#e0f2fe" stroke-width="4"/>
+  
+  <!-- Left Character: Dad -->
+  <g transform="translate(18, 22)">
+    <!-- Hair -->
+    <path d="M 12 18 C 12 8 28 8 32 18 C 34 14 30 6 22 6 C 14 6 10 12 12 18 Z" fill="#475569"/>
+    <!-- Head -->
+    <ellipse cx="22" cy="24" rx="13" ry="14" fill="url(#skin)"/>
+    <!-- Eyes -->
+    <circle cx="17" cy="23" r="2" fill="#1e293b"/>
+    <circle cx="27" cy="23" r="2" fill="#1e293b"/>
+    <!-- Smile -->
+    <path d="M 19 28 Q 22 32 25 28" stroke="#9a3412" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Cheeks -->
+    <circle cx="14" cy="26" r="2.5" fill="#fca5a5" opacity="0.6"/>
+    <circle cx="30" cy="26" r="2.5" fill="#fca5a5" opacity="0.6"/>
+    <!-- Body -->
+    <path d="M 6 40 C 6 34 14 34 22 34 C 30 34 38 34 38 40 L 40 56 L 4 56 Z" fill="#2563eb"/>
+  </g>
+
+  <!-- Right Character: Mom -->
+  <g transform="translate(56, 24)">
+    <!-- Long Hair Back -->
+    <path d="M 10 16 C 10 2 36 2 36 16 C 38 28 34 38 34 44 C 30 42 28 36 28 36 C 24 36 20 40 12 44 C 12 36 8 28 10 16 Z" fill="#b45309"/>
+    <!-- Head -->
+    <ellipse cx="23" cy="23" rx="12" ry="13" fill="url(#skin)"/>
+    <!-- Hair front / bangs -->
+    <path d="M 11 16 Q 23 10 35 16 Q 30 11 23 11 Q 16 11 11 16 Z" fill="#92400e"/>
+    <!-- Eyes -->
+    <circle cx="18" cy="22" r="2" fill="#1e293b"/>
+    <circle cx="28" cy="22" r="2" fill="#1e293b"/>
+    <!-- Smile -->
+    <path d="M 20 27 Q 23 31 26 27" stroke="#9a3412" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Cheeks -->
+    <circle cx="15" cy="25" r="2.5" fill="#fca5a5" opacity="0.7"/>
+    <circle cx="31" cy="25" r="2.5" fill="#fca5a5" opacity="0.7"/>
+    <!-- Body -->
+    <path d="M 10 38 C 10 33 16 33 23 33 C 30 33 36 33 36 38 L 38 54 L 8 54 Z" fill="#ec4899"/>
+  </g>
+
+  <!-- Little Heart in Center -->
+  <path d="M 60 76 C 60 73 57 70 54 70 C 51 70 49 72 49 75 C 49 80 57 85 60 88 C 63 85 71 80 71 75 C 71 72 69 70 66 70 C 63 70 60 73 60 76 Z" fill="#f43f5e" transform="translate(0, -5) scale(0.65) translate(32, 20)"/>
+</svg>

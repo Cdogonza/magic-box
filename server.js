@@ -36,6 +36,20 @@ if (fs.existsSync(configFile)) {
   }
 }
 
+// Inicializar 3 canales familiares por defecto si no existen
+const defaultChannels = [
+  { id: config.targetGroupId || '', name: config.targetGroupName || 'Papá y Mamá', avatar: '/avatars/family1.svg' },
+  { id: '', name: 'Abuelos Paternos', avatar: '/avatars/family2.svg' },
+  { id: '', name: 'Abuelos Maternos', avatar: '/avatars/family3.svg' }
+];
+
+if (!Array.isArray(config.channels) || config.channels.length === 0) {
+  config.channels = defaultChannels;
+}
+if (typeof config.activeChannelIndex !== 'number' || config.activeChannelIndex < 0 || config.activeChannelIndex >= config.channels.length) {
+  config.activeChannelIndex = 0;
+}
+
 function saveConfig(newConfig) {
   config = { ...config, ...newConfig };
   fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
@@ -51,6 +65,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/sounds', express.static(path.join(__dirname, 'sounds')));
 app.use('/audio-received', express.static(path.join(__dirname, 'data', 'received')));
+app.use('/data/avatars', express.static(path.join(__dirname, 'data', 'avatars')));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -198,13 +213,70 @@ app.post('/api/logout', async (req, res) => {
 app.post('/api/btn/listen', async (req, res) => {
   try {
     const isWeb = req.query.source === 'web' || req.body?.source === 'web';
-    console.log(`[Botón] 🟢 Presionado: ESCUCHAR (Origen: ${isWeb ? 'Navegador Web' : 'Físico / Terminal'})`);
+    const targetChannel = req.body?.channelIndex ?? config.activeChannelIndex;
+    console.log(`[Botón] 🟢 Presionado: ESCUCHAR (Canal: ${targetChannel}, Origen: ${isWeb ? 'Navegador Web' : 'Físico / Terminal'})`);
     // Si la llamada viene del navegador, el navegador se encargará de reproducir el audio con HTML5 Audio
-    const played = await audio.playNextOrLast(isWeb);
+    const played = await audio.playNextOrLast(isWeb, targetChannel);
     const audios = audio.getReceivedAudios();
     const unreadCount = audios.filter(a => !a.isRead).length;
     broadcast('unread-update', { unreadCount });
     res.json({ success: true, played, unreadCount });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// BOTÓN 3: CAMBIAR DE GRUPO FAMILIAR (Nariz)
+app.post('/api/channels/switch', (req, res) => {
+  let newIndex;
+  const numChannels = config.channels?.length || 3;
+  if (typeof req.body?.index === 'number') {
+    newIndex = req.body.index;
+  } else {
+    newIndex = ((config.activeChannelIndex || 0) + 1) % numChannels;
+  }
+  if (newIndex >= 0 && newIndex < numChannels) {
+    config.activeChannelIndex = newIndex;
+    saveConfig({ activeChannelIndex: newIndex });
+    whatsapp.config = config;
+    audio.config = config;
+    broadcast('channel-switched', {
+      activeChannelIndex: newIndex,
+      activeChannel: config.channels[newIndex]
+    });
+    console.log(`[Caja] 👃 Cambiado a canal ${newIndex}: "${config.channels[newIndex]?.name}"`);
+    res.json({ success: true, activeChannelIndex: newIndex, activeChannel: config.channels[newIndex] });
+  } else {
+    res.status(400).json({ error: 'Índice de canal fuera de rango' });
+  }
+});
+
+// Subir foto personalizada para un canal
+app.post('/api/channels/:index/avatar', express.json({ limit: '10mb' }), (req, res) => {
+  const index = parseInt(req.params.index, 10);
+  if (isNaN(index) || index < 0 || index >= (config.channels?.length || 3)) {
+    return res.status(400).json({ error: 'Índice de ranura inválido' });
+  }
+  const { dataUrl } = req.body;
+  if (!dataUrl || !dataUrl.startsWith('data:image')) {
+    return res.status(400).json({ error: 'Formato de imagen inválido' });
+  }
+  try {
+    const matches = dataUrl.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+    if (!matches) return res.status(400).json({ error: 'No se pudo decodificar la imagen' });
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const filename = `slot_${index}_${Date.now()}.${ext}`;
+    const avatarsDir = path.join(__dirname, 'data', 'avatars');
+    if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir, { recursive: true });
+    const filePath = path.join(avatarsDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    const avatarUrl = `/data/avatars/${filename}`;
+    config.channels[index].avatar = avatarUrl;
+    saveConfig({ channels: config.channels });
+    broadcast('config-updated', { config });
+    res.json({ success: true, avatarUrl });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -279,8 +351,17 @@ app.post('/api/upload-voice', express.raw({ type: '*/*', limit: '15mb' }), async
     fs.writeFileSync(tempPath, req.body);
 
     if (whatsapp.isConnected) {
-      await whatsapp.sendVoiceNote(tempPath);
-      console.log('✓ Audio enviado exitosamente a WhatsApp desde el navegador!');
+      const activeChannel = config.channels?.[config.activeChannelIndex];
+      const targetJid = activeChannel?.id || config.targetGroupId;
+      if (!targetJid) {
+        return res.status(400).json({
+          success: false,
+          sent: false,
+          error: `El contacto "${activeChannel?.name || 'seleccionado'}" aún no tiene un grupo asignado en Configuración.`
+        });
+      }
+      await whatsapp.sendVoiceNote(tempPath, targetJid);
+      console.log(`✓ Audio enviado exitosamente a WhatsApp (${activeChannel?.name || targetJid}) desde el navegador!`);
       res.json({ success: true, sent: true });
     } else {
       console.warn('[Caja] WhatsApp no está conectado actualmente');

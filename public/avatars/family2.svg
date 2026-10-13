@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <linearGradient id="skin2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fed7aa"/>
+      <stop offset="100%" stop-color="#fdba74"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="56" fill="url(#bg2)" stroke="#d1fae5" stroke-width="4"/>
+  
+  <!-- Left Character: Abuelo -->
+  <g transform="translate(18, 22)">
+    <!-- White Hair with cute balding sides -->
+    <path d="M 8 20 C 8 8 36 8 36 20 C 37 16 34 8 22 8 C 10 8 7 16 8 20 Z" fill="#e2e8f0"/>
+    <!-- Head -->
+    <ellipse cx="22" cy="24" rx="13" ry="14" fill="url(#skin2)"/>
+    <!-- Cute Mustache -->
+    <path d="M 16 31 Q 22 28 28 31 Q 22 34 16 31 Z" fill="#cbd5e1"/>
+    <!-- Glasses -->
+    <circle cx="16" cy="22" r="5" fill="none" stroke="#334155" stroke-width="2"/>
+    <circle cx="28" cy="22" r="5" fill="none" stroke="#334155" stroke-width="2"/>
+    <line x1="21" y1="22" x2="23" y2="22" stroke="#334155" stroke-width="2"/>
+    <!-- Eyes behind glasses -->
+    <circle cx="16" cy="22" r="1.5" fill="#1e293b"/>
+    <circle cx="28" cy="22" r="1.5" fill="#1e293b"/>
+    <!-- Body -->
+    <path d="M 6 40 C 6 34 14 34 22 34 C 30 34 38 34 38 40 L 40 56 L 4 56 Z" fill="#0d9488"/>
+  </g>
+
+  <!-- Right Character: Abuela -->
+  <g transform="translate(56, 22)">
+    <!-- Silver Bun -->
+    <circle cx="23" cy="8" r="7" fill="#cbd5e1"/>
+    <!-- Hair -->
+    <path d="M 9 18 C 9 6 37 6 37 18 C 37 26 33 30 33 30 C 31 16 15 16 13 30 C 13 30 9 26 9 18 Z" fill="#e2e8f0"/>
+    <!-- Head -->
+    <ellipse cx="23" cy="24" rx="12" ry="13" fill="url(#skin2)"/>
+    <!-- Glasses -->
+    <circle cx="17" cy="23" r="4.5" fill="none" stroke="#b45309" stroke-width="1.8"/>
+    <circle cx="29" cy="23" r="4.5" fill="none" stroke="#b45309" stroke-width="1.8"/>
+    <line x1="21.5" y1="23" x2="24.5" y2="23" stroke="#b45309" stroke-width="1.8"/>
+    <!-- Eyes -->
+    <circle cx="17" cy="23" r="1.5" fill="#1e293b"/>
+    <circle cx="29" cy="23" r="1.5" fill="#1e293b"/>
+    <!-- Smile -->
+    <path d="M 20 30 Q 23 33 26 30" stroke="#9a3412" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Cheeks -->
+    <circle cx="13" cy="27" r="2.5" fill="#fca5a5" opacity="0.7"/>
+    <circle cx="33" cy="27" r="2.5" fill="#fca5a5" opacity="0.7"/>
+    <!-- Body -->
+    <path d="M 10 39 C 10 34 16 34 23 34 C 30 34 36 34 36 39 L 38 56 L 8 56 Z" fill="#8b5cf6"/>
+  </g>
+</svg>

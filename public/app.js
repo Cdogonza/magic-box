@@ -30,6 +30,46 @@ const soundWaves = document.getElementById('soundWaves');
 const audioList = document.getElementById('audioList');
 const audioCountBadge = document.getElementById('audioCountBadge');
 
+// Elementos de la Cara (Nariz y Boca)
+const btnNose = document.getElementById('btnNose');
+const mouthCards = [
+  document.getElementById('channelCard0'),
+  document.getElementById('channelCard1'),
+  document.getElementById('channelCard2')
+];
+const mouthAvatars = [
+  document.getElementById('channelAvatar0'),
+  document.getElementById('channelAvatar1'),
+  document.getElementById('channelAvatar2')
+];
+const mouthNames = [
+  document.getElementById('channelName0'),
+  document.getElementById('channelName1'),
+  document.getElementById('channelName2')
+];
+const mouthBadges = [
+  document.getElementById('channelBadge0'),
+  document.getElementById('channelBadge1'),
+  document.getElementById('channelBadge2')
+];
+
+// Elementos de ranuras en Ajustes
+const slotNames = [
+  document.getElementById('slotName0'),
+  document.getElementById('slotName1'),
+  document.getElementById('slotName2')
+];
+const slotGroups = [
+  document.getElementById('slotGroup0'),
+  document.getElementById('slotGroup1'),
+  document.getElementById('slotGroup2')
+];
+const slotPhotoInputs = [
+  document.getElementById('slotPhotoInput0'),
+  document.getElementById('slotPhotoInput1'),
+  document.getElementById('slotPhotoInput2')
+];
+
 const btnSettings = document.getElementById('btnSettings');
 const settingsModal = document.getElementById('settingsModal');
 const btnCloseSettings = document.getElementById('btnCloseSettings');
@@ -99,9 +139,18 @@ function handleSocketMessage(msg) {
       if (msg.isRecording !== undefined && !mediaRecorder) setRecordingUI(msg.isRecording);
       if (msg.isPlaying !== undefined && !currentAudioPlayer) setPlayingUI(msg.isPlaying);
       break;
+    case 'channel-switched':
+      state.activeChannelIndex = msg.activeChannelIndex;
+      playPopSound();
+      updateChannelsUI();
+      loadAudios();
+      break;
     case 'new-message':
       showStatus(`🔔 ¡Nuevo mensaje de ${msg.sender}!`, '🎉');
       webSounds.ding.play().catch(() => {});
+      if (typeof msg.channelIndex === 'number' && mouthBadges[msg.channelIndex]) {
+        mouthBadges[msg.channelIndex].classList.remove('hidden');
+      }
       if (msg.unreadCount !== undefined) {
         updateGreenLight(msg.unreadCount);
       }
@@ -230,17 +279,23 @@ async function loadStatus() {
 }
 
 function applyConfigUI(cfg) {
+  state.config = cfg || {};
+  state.activeChannelIndex = typeof cfg.activeChannelIndex === 'number' ? cfg.activeChannelIndex : 0;
   if (cfg.buttonMode) {
     state.buttonMode = cfg.buttonMode;
     buttonModeSelect.value = cfg.buttonMode;
     recordSub.textContent = cfg.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
   }
-  if (cfg.targetGroupId) {
-    selectGroup.value = cfg.targetGroupId;
-  }
   if (cfg.autoPlayNewMessages !== undefined) {
     autoPlayCheckbox.checked = cfg.autoPlayNewMessages;
   }
+  if (Array.isArray(cfg.channels)) {
+    cfg.channels.forEach((ch, idx) => {
+      if (slotNames[idx] && ch.name) slotNames[idx].value = ch.name;
+      if (slotGroups[idx] && ch.id) slotGroups[idx].value = ch.id;
+    });
+  }
+  updateChannelsUI();
 }
 
 async function loadGroups() {
@@ -253,16 +308,19 @@ async function loadGroups() {
 
 function populateGroups(groups) {
   if (!Array.isArray(groups)) return;
-  selectGroup.innerHTML = '<option value="">-- Selecciona el grupo familiar --</option>';
-  groups.forEach(g => {
-    const opt = document.createElement('option');
-    opt.value = g.id;
-    opt.textContent = `${g.subject} (${g.size || 0} participantes)`;
-    selectGroup.appendChild(opt);
+  state.cachedGroups = groups;
+  slotGroups.forEach((select, idx) => {
+    if (!select) return;
+    const currentVal = state.config.channels?.[idx]?.id || '';
+    select.innerHTML = `<option value="">-- Elige grupo WhatsApp para Ranura ${idx + 1} --</option>`;
+    groups.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.id;
+      opt.textContent = `${g.subject} (${g.size || 0} participantes)`;
+      select.appendChild(opt);
+    });
+    if (currentVal) select.value = currentVal;
   });
-  if (state.config.targetGroupId) {
-    selectGroup.value = state.config.targetGroupId;
-  }
 }
 
 async function loadAudios() {
@@ -270,8 +328,30 @@ async function loadAudios() {
     const res = await fetch('/api/audios');
     const audios = await res.json();
     audioCountBadge.textContent = `${audios.length} audios`;
-    const unread = audios.filter(a => !a.isRead).length;
-    updateGreenLight(unread);
+
+    // Conteo de audios no leídos por ranura (0, 1, 2)
+    const unreadPerChannel = [0, 0, 0];
+    audios.forEach(a => {
+      if (!a.isRead) {
+        const ch = typeof a.channelIndex === 'number' ? a.channelIndex : 0;
+        if (ch >= 0 && ch < 3) unreadPerChannel[ch]++;
+      }
+    });
+
+    mouthBadges.forEach((badge, idx) => {
+      if (!badge) return;
+      const count = unreadPerChannel[idx];
+      if (count > 0) {
+        badge.classList.remove('hidden');
+        badge.textContent = count > 1 ? count : '🔔';
+      } else {
+        badge.classList.add('hidden');
+      }
+    });
+
+    const activeUnread = unreadPerChannel[state.activeChannelIndex || 0];
+    const totalUnread = audios.filter(a => !a.isRead).length;
+    updateGreenLight(activeUnread > 0 ? activeUnread : totalUnread);
 
     if (audios.length === 0) {
       audioList.innerHTML = '<div class="empty-inbox">No han llegado audios todavía. Los audios de la familia aparecerán aquí.</div>';
@@ -285,11 +365,12 @@ async function loadAudios() {
       const timeStr = new Date(a.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       const parts = a.filename.split('_');
-      const sender = parts.length >= 2 ? parts[1].replace(/_read/, '').replace(/\.[^/.]+$/, '') : 'Familiar';
+      const sender = parts.length >= 2 ? parts[1].replace(/_read/, '').replace(/\.[^/.]+$/, '').replace(/_ch[0-2]/, '') : 'Familiar';
+      const channelTag = state.config.channels?.[a.channelIndex]?.name || `Ranura ${(a.channelIndex || 0) + 1}`;
 
       item.innerHTML = `
         <div class="audio-info">
-          <div class="audio-sender">🗣️ ${sender}</div>
+          <div class="audio-sender">🗣️ ${sender} <span style="font-size:0.75rem; color:#38bdf8; font-weight:normal;">(${channelTag})</span></div>
           <div class="audio-time">${timeStr} • ${a.isRead ? 'Escuchado' : 'Nuevo'}</div>
         </div>
         <button class="btn-play-item" data-url="${a.url}">▶ Escuchar</button>
@@ -453,7 +534,11 @@ async function handleListenAction() {
 
   try {
     showStatus('Buscando mensajes nuevos...', '⏳');
-    const res = await fetch('/api/btn/listen?source=web', { method: 'POST' });
+    const res = await fetch('/api/btn/listen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: 'web', channelIndex: state.activeChannelIndex })
+    });
     const data = await res.json();
 
     if (data.played && data.played.url) {
@@ -641,13 +726,19 @@ btnCloseSettings.addEventListener('click', () => {
 });
 
 btnSaveConfig.addEventListener('click', async () => {
-  const selectedGroupId = selectGroup.value;
-  const selectedOpt = selectGroup.options[selectGroup.selectedIndex];
-  const groupName = selectedOpt ? selectedOpt.textContent.split(' (')[0] : '';
+  const updatedChannels = (state.config.channels || []).slice(0, 3);
+  for (let i = 0; i < 3; i++) {
+    const name = slotNames[i]?.value.trim() || `Ranura ${i + 1}`;
+    const id = slotGroups[i]?.value || '';
+    const avatar = updatedChannels[i]?.avatar || `/avatars/family${i + 1}.svg`;
+    updatedChannels[i] = { id, name, avatar };
+  }
 
   const newConfig = {
-    targetGroupId: selectedGroupId,
-    targetGroupName: groupName,
+    ...state.config,
+    channels: updatedChannels,
+    targetGroupId: updatedChannels[0]?.id || '',
+    targetGroupName: updatedChannels[0]?.name || '',
     buttonMode: buttonModeSelect.value,
     autoPlayNewMessages: autoPlayCheckbox.checked
   };
@@ -661,7 +752,9 @@ btnSaveConfig.addEventListener('click', async () => {
     if (res.ok) {
       settingsModal.classList.add('hidden');
       showStatus('Configuración guardada', '✅');
+      state.config = newConfig;
       state.buttonMode = buttonModeSelect.value;
+      updateChannelsUI();
     }
   } catch (e) {
     alert('Error guardando configuración');
@@ -703,6 +796,146 @@ if (btnRelink) {
     }
   });
 }
+
+// ==========================================
+// INTERACCIÓN DE LA CARA: NARIZ Y BOCA
+// ==========================================
+function playPopSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(340, now);
+    osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(460, now + 0.16);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.24);
+  } catch (e) {}
+}
+
+async function switchChannel(targetIndex = null) {
+  unlockAudio();
+  playPopSound();
+  if (btnNose) {
+    btnNose.classList.add('pressed');
+    setTimeout(() => btnNose.classList.remove('pressed'), 200);
+  }
+
+  try {
+    const body = (targetIndex !== null && targetIndex !== undefined)
+      ? JSON.stringify({ index: targetIndex })
+      : '{}';
+
+    const res = await fetch('/api/channels/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.activeChannelIndex = data.activeChannelIndex;
+      updateChannelsUI();
+      loadAudios();
+    }
+  } catch (err) {
+    console.error('Error al cambiar canal:', err);
+  }
+}
+
+function updateChannelsUI() {
+  const activeIdx = state.activeChannelIndex || 0;
+  const channels = state.config.channels || [
+    { name: 'Papá y Mamá', avatar: '/avatars/family1.svg' },
+    { name: 'Abuelos Paternos', avatar: '/avatars/family2.svg' },
+    { name: 'Abuelos Maternos', avatar: '/avatars/family3.svg' }
+  ];
+
+  mouthCards.forEach((card, idx) => {
+    if (!card) return;
+    const ch = channels[idx] || {};
+    if (mouthAvatars[idx] && ch.avatar) {
+      mouthAvatars[idx].src = ch.avatar;
+    }
+    if (mouthNames[idx] && ch.name) {
+      mouthNames[idx].textContent = ch.name;
+    }
+    if (idx === activeIdx) {
+      card.classList.add('is-active');
+    } else {
+      card.classList.remove('is-active');
+    }
+  });
+
+  const activeChannel = channels[activeIdx] || {};
+  showStatus(`Hablando con: ${activeChannel.name || 'Familia'} ✨`, '🗣️');
+}
+
+function setupSlotPhotoUploads() {
+  slotPhotoInputs.forEach((input, idx) => {
+    if (!input) return;
+    input.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const dataUrl = ev.target.result;
+        try {
+          showStatus('Subiendo foto para ' + (slotNames[idx]?.value || `Ranura ${idx + 1}`) + '...', '⏳');
+          const res = await fetch(`/api/channels/${idx}/avatar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dataUrl })
+          });
+          const data = await res.json();
+          if (data.success && data.avatarUrl) {
+            if (mouthAvatars[idx]) mouthAvatars[idx].src = data.avatarUrl;
+            if (state.config.channels && state.config.channels[idx]) {
+              state.config.channels[idx].avatar = data.avatarUrl;
+            }
+            showStatus('Foto actualizada con éxito 📸', '✅');
+          } else {
+            alert('Error al guardar la foto: ' + (data.error || ''));
+          }
+        } catch (err) {
+          console.error('Error subiendo foto:', err);
+          alert('Error de conexión al subir foto');
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+}
+
+// Escuchadores de eventos para la Cara
+if (btnNose) {
+  btnNose.addEventListener('click', () => switchChannel());
+  btnNose.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    switchChannel();
+  });
+}
+
+mouthCards.forEach((card, idx) => {
+  if (card) {
+    card.addEventListener('click', () => switchChannel(idx));
+  }
+});
+
+setupSlotPhotoUploads();
 
 // Inicialización
 connectWebSocket();

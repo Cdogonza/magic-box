@@ -5,5 +5,23 @@
   "minRecordDurationSeconds": 1.2,
   "autoPlayNewMessages": false,
   "port": 3000,
-  "volume": 100
+  "volume": 100,
+  "channels": [
+    {
+      "id": "120363413367941258@g.us",
+      "name": "prueba",
+      "avatar": "/avatars/family1.svg"
+    },
+    {
+      "id": "",
+      "name": "Abuelos Paternos",
+      "avatar": "/avatars/family2.svg"
+    },
+    {
+      "id": "",
+      "name": "Abuelos Maternos",
+      "avatar": "/avatars/family3.svg"
+    }
+  ],
+  "activeChannelIndex": 0
 }
