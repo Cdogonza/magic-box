@@ -155,8 +155,9 @@ function handleSocketMessage(msg) {
     case 'new-message':
       showStatus(`🔔 ¡Nuevo mensaje de ${msg.sender}!`, '🎉');
       webSounds.ding.play().catch(() => {});
-      if (typeof msg.channelIndex === 'number' && mouthBadges[msg.channelIndex]) {
-        mouthBadges[msg.channelIndex].classList.remove('hidden');
+      if (typeof msg.channelIndex === 'number') {
+        if (mouthBadges[msg.channelIndex]) mouthBadges[msg.channelIndex].classList.remove('hidden');
+        if (mouthCards[msg.channelIndex]) mouthCards[msg.channelIndex].classList.add('has-unread');
       }
       if (msg.unreadCount !== undefined) {
         updateGreenLight(msg.unreadCount);
@@ -208,8 +209,8 @@ function setConnected(connected, user = null) {
 }
 
 function showStatus(text, icon = 'ℹ️') {
-  statusMessage.textContent = text;
-  statusIcon.textContent = icon;
+  if (statusMessage) statusMessage.textContent = text;
+  if (statusIcon) statusIcon.textContent = icon;
 }
 
 // Control del estado de la LUZ VERDE (Botón Escuchar)
@@ -218,14 +219,16 @@ function updateGreenLight(unreadCount) {
   const isLit = state.unreadCount > 0 || state.isPlaying;
   if (isLit) {
     btnListen.classList.add('is-lit');
-    if (listenEmoji) listenEmoji.textContent = '🔔';
-    unreadBadgeText.textContent = state.isPlaying
-      ? 'Reproduciendo audio...'
-      : `${state.unreadCount} nuevo(s) por escuchar`;
+    if (listenEmoji) listenEmoji.textContent = state.isPlaying ? '🔊' : '👂';
+    if (unreadBadgeText) {
+      unreadBadgeText.textContent = state.isPlaying
+        ? 'Reproduciendo audio...'
+        : `${state.unreadCount} nuevo(s) por escuchar`;
+    }
   } else {
     btnListen.classList.remove('is-lit');
     if (listenEmoji) listenEmoji.textContent = '👂';
-    unreadBadgeText.textContent = 'Buzón al día • Sin audios';
+    if (unreadBadgeText) unreadBadgeText.textContent = 'Buzón al día • Sin audios';
   }
 }
 
@@ -234,17 +237,17 @@ function setRecordingUI(isRecording) {
   state.isRecording = isRecording;
   if (isRecording) {
     btnRecord.classList.add('is-lit', 'recording');
-    recordTitle.textContent = 'GRABANDO...';
-    recordSub.textContent = state.buttonMode === 'hold' ? 'Suelta para enviar' : 'Toca para enviar';
-    recordEmoji.textContent = '🔴';
-    soundWaves.classList.remove('hidden');
+    if (recordTitle) recordTitle.textContent = 'GRABANDO...';
+    if (recordSub) recordSub.textContent = state.buttonMode === 'hold' ? 'Suelta para enviar' : 'Toca para enviar';
+    if (recordEmoji) recordEmoji.textContent = '🎙️';
+    if (soundWaves) soundWaves.classList.remove('hidden');
     showStatus('¡Luz roja encendida! Grabando tu voz...', '🎙️');
   } else {
     btnRecord.classList.remove('is-lit', 'recording');
-    recordTitle.textContent = 'HABLAR';
-    recordSub.textContent = state.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
-    recordEmoji.textContent = '🎙️';
-    soundWaves.classList.add('hidden');
+    if (recordTitle) recordTitle.textContent = 'HABLAR';
+    if (recordSub) recordSub.textContent = state.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
+    if (recordEmoji) recordEmoji.textContent = '🎙️';
+    if (soundWaves) soundWaves.classList.add('hidden');
   }
 }
 
@@ -254,7 +257,7 @@ function setPlayingUI(isPlaying) {
     btnListen.classList.add('pressed', 'is-lit');
     showStatus('Reproduciendo mensaje de la familia...', '🔊');
     if (listenEmoji) listenEmoji.textContent = '🔊';
-    unreadBadgeText.textContent = 'Reproduciendo audio...';
+    if (unreadBadgeText) unreadBadgeText.textContent = 'Reproduciendo audio...';
   } else {
     btnListen.classList.remove('pressed');
     updateGreenLight(state.unreadCount || 0);
@@ -291,7 +294,7 @@ function applyConfigUI(cfg) {
   if (cfg.buttonMode) {
     state.buttonMode = cfg.buttonMode;
     buttonModeSelect.value = cfg.buttonMode;
-    recordSub.textContent = cfg.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
+    if (recordSub) recordSub.textContent = cfg.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
   }
   if (cfg.autoPlayNewMessages !== undefined) {
     autoPlayCheckbox.checked = cfg.autoPlayNewMessages;
@@ -833,9 +836,11 @@ function updateBadgesAndGreenLightFromCache() {
     const count = unreadPerChannel[idx];
     if (count > 0) {
       badge.classList.remove('hidden');
-      badge.textContent = count > 1 ? count : '🔔';
+      badge.textContent = '🔔';
+      if (mouthCards[idx]) mouthCards[idx].classList.add('has-unread');
     } else {
       badge.classList.add('hidden');
+      if (mouthCards[idx]) mouthCards[idx].classList.remove('has-unread');
     }
   });
 

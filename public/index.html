@@ -11,23 +11,9 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Encabezado superior -->
-    <header class="app-header">
-      <div class="header-brand">
-        <span class="brand-icon">📦✨</span>
-        <div class="brand-text">
-          <h1>Caja Mágica</h1>
-          <p class="subtitle">Walkie-Talkie Familiar para Niños</p>
-        </div>
-      </div>
-      <div class="header-status">
-        <span id="connectionBadge" class="status-badge offline">
-          <span class="status-dot"></span>
-          <span id="connectionText">Desconectado</span>
-        </span>
-        <button id="btnSettings" class="btn-icon" title="Configuración">⚙️</button>
-      </div>
-    </header>
+    <!-- Botón discreto de configuración en el vértice superior derecho -->
+    <button id="btnSettings" class="corner-settings-btn" type="button" title="Configuración">⚙️</button>
+    <div id="connectionBadge" class="hidden"><span id="connectionText"></span></div>
 
     <!-- Modal de Vinculación QR (si no está conectado) -->
     <section id="qrSection" class="card qr-card hidden">
@@ -42,55 +28,47 @@
       <p class="qr-hint">Se conectará automáticamente en cuanto lo escanees.</p>
     </section>
 
-    <!-- PANTALLA PRINCIPAL DE LA CAJA: LA CARA MÁGICA -->
+    <!-- PANTALLA PRINCIPAL DE LA CAJA: LA CARA MÁGICA HORIZONTAL -->
     <main class="main-box-controls face-layout">
-      <!-- Banner de estado dinámico -->
-      <div class="status-banner" id="statusBanner">
+      <!-- Elementos de estado ocultos para retrocompatibilidad con app.js -->
+      <div class="status-banner hidden" id="statusBanner" style="display: none;">
         <span id="statusIcon">✨</span>
-        <span id="statusMessage">Hablando con: Papá y Mamá</span>
+        <span id="statusMessage"></span>
       </div>
 
-      <!-- 1. LOS OJOS: Botón Verde (Escuchar) y Botón Rojo (Hablar) -->
+      <!-- 1. LOS OJOS: Botón Verde (Escuchar) y Botón Rojo (Hablar) - CUADRADOS, SÓLO SÍMBOLOS -->
       <div class="face-eyes-row">
         <!-- OJO IZQUIERDO: ESCUCHAR -->
         <button id="btnListen" class="eye-btn btn-listen" type="button" title="Escuchar audios">
           <div class="btn-glow"></div>
           <div class="light-indicator" id="greenLightIndicator"></div>
-          <div class="eye-inner">
-            <span class="btn-emoji" id="listenEmoji">👂</span>
-            <span class="btn-title">ESCUCHAR</span>
-            <span class="btn-sub" id="unreadBadgeText">Buzón al día</span>
-          </div>
+          <span class="btn-emoji" id="listenEmoji">👂</span>
+          <span class="hidden" id="unreadBadgeText" style="display: none;"></span>
         </button>
 
         <!-- OJO DERECHO: HABLAR -->
         <button id="btnRecord" class="eye-btn btn-record" type="button" title="Grabar mensaje">
           <div class="btn-glow"></div>
           <div class="light-indicator" id="redLightIndicator"></div>
-          <div class="eye-inner">
-            <span class="btn-emoji" id="recordEmoji">🎙️</span>
-            <span class="btn-title" id="recordTitle">HABLAR</span>
-            <span class="btn-sub" id="recordSub">Toca para hablar</span>
-          </div>
+          <span class="btn-emoji" id="recordEmoji">🎙️</span>
           <!-- Onda animada de voz cuando graba -->
           <div class="sound-waves hidden" id="soundWaves">
             <span></span><span></span><span></span><span></span><span></span>
           </div>
+          <span class="hidden" id="recordTitle" style="display: none;"></span>
+          <span class="hidden" id="recordSub" style="display: none;"></span>
         </button>
       </div>
 
-      <!-- 2. LA NARIZ: Botón Switcher central para cambiar de grupo -->
+      <!-- 2. LA NARIZ: Botón Switcher central para cambiar de grupo (CUADRADO, SÓLO ICONO) -->
       <div class="face-nose-wrapper">
         <button id="btnNose" class="nose-btn" type="button" title="Toca la nariz para cambiar a quién le hablas">
           <div class="nose-glow"></div>
-          <div class="nose-inner">
-            <span class="nose-emoji">👃</span>
-            <span class="nose-text">CAMBIAR</span>
-          </div>
+          <span class="nose-emoji">👃</span>
         </button>
       </div>
 
-      <!-- 3. LA BOCA: Fila de 3 marcos con fotos de los grupos familiares -->
+      <!-- 3. LA BOCA: Fila de 3 marcos CUADRADOS con fotos de los grupos familiares -->
       <div class="face-mouth-row" id="mouthChannelsRow">
         <!-- Ranura 0 -->
         <div class="channel-card is-active" data-index="0" id="channelCard0" title="Toca para elegir">
@@ -121,14 +99,14 @@
       </div>
     </main>
 
-    <!-- BUZÓN DE MENSAJES RECIBIDOS -->
-    <section class="inbox-section card">
+    <!-- BUZÓN DE MENSAJES RECIBIDOS (Oculto en vista de la cara física) -->
+    <section class="inbox-section card hidden" style="display: none;">
       <div class="inbox-header">
         <h3>📬 Buzón de Mensajes</h3>
         <span class="badge-count" id="audioCountBadge">0 audios</span>
       </div>
       <div class="audio-list" id="audioList">
-        <div class="empty-inbox">No han llegado audios todavía. Los audios de la familia aparecerán aquí.</div>
+        <div class="empty-inbox">No han llegado audios todavía.</div>
       </div>
     </section>
 
