@@ -36,7 +36,7 @@
         <p>Abre WhatsApp en tu celular principal > Dispositivos vinculados > Vincular un dispositivo</p>
       </div>
       <div class="qr-wrapper">
-        <canvas id="qrCanvas"></canvas>
+        <img id="qrImage" class="qr-img hidden" alt="Código QR de WhatsApp" src="" />
         <div id="qrLoading" class="loading-spinner">Generando código...</div>
       </div>
       <p class="qr-hint">Se conectará automáticamente en cuanto lo escanees.</p>
@@ -134,7 +134,6 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

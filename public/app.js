@@ -11,7 +11,7 @@ let state = {
 const connectionBadge = document.getElementById('connectionBadge');
 const connectionText = document.getElementById('connectionText');
 const qrSection = document.getElementById('qrSection');
-const qrCanvas = document.getElementById('qrCanvas');
+const qrImage = document.getElementById('qrImage');
 const qrLoading = document.getElementById('qrLoading');
 const statusBanner = document.getElementById('statusBanner');
 const statusIcon = document.getElementById('statusIcon');
@@ -83,7 +83,7 @@ function connectWebSocket() {
 function handleSocketMessage(msg) {
   switch (msg.type) {
     case 'qr':
-      renderQR(msg.qr);
+      renderQR(msg.qr, msg.qrDataUrl);
       break;
     case 'ready':
       setConnected(true, msg.user);
@@ -123,13 +123,18 @@ function handleSocketMessage(msg) {
   }
 }
 
-function renderQR(qrText) {
+function renderQR(qrText, qrDataUrl = null) {
   qrSection.classList.remove('hidden');
   qrLoading.classList.add('hidden');
-  if (window.QRCode) {
-    QRCode.toCanvas(qrCanvas, qrText, { width: 200, margin: 1 }, (err) => {
-      if (err) console.error(err);
-    });
+  if (qrImage) {
+    qrImage.classList.remove('hidden');
+    if (qrDataUrl) {
+      qrImage.src = qrDataUrl;
+    } else if (qrText && qrText.startsWith('data:image')) {
+      qrImage.src = qrText;
+    } else {
+      qrImage.src = `/api/qr-image?t=${Date.now()}`;
+    }
   }
 }
 
@@ -201,8 +206,8 @@ async function loadStatus() {
     const res = await fetch('/api/status');
     const data = await res.json();
     setConnected(data.connected, data.user);
-    if (!data.connected && data.qr) {
-      renderQR(data.qr);
+    if (!data.connected && (data.qr || data.qrDataUrl)) {
+      renderQR(data.qr, data.qrDataUrl);
     }
     state.config = data.config || {};
     applyConfigUI(state.config);

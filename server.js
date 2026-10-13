@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import readline from 'node:readline';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
+import QRCode from 'qrcode';
 
 import AudioManager from './lib/audio.js';
 import WhatsAppClient from './lib/whatsapp.js';
@@ -60,8 +61,13 @@ function broadcast(type, payload = {}) {
 }
 
 // Eventos de WhatsApp
-whatsapp.on('qr', (qr) => {
-  broadcast('qr', { qr });
+whatsapp.on('qr', async (qr) => {
+  try {
+    const qrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 300 });
+    broadcast('qr', { qr, qrDataUrl });
+  } catch (e) {
+    broadcast('qr', { qr });
+  }
 });
 
 whatsapp.on('status', (status) => {
@@ -102,16 +108,37 @@ audio.on('status', (status) => {
 // Rutas de API REST
 app.get('/api/status', async (req, res) => {
   const audios = audio.getReceivedAudios();
+  let qrDataUrl = null;
+  if (whatsapp.qrCode) {
+    try {
+      qrDataUrl = await QRCode.toDataURL(whatsapp.qrCode, { margin: 1, width: 300 });
+    } catch (e) {}
+  }
   res.json({
     connected: whatsapp.isConnected,
     user: whatsapp.sock?.user || null,
     qr: whatsapp.qrCode,
+    qrDataUrl,
     isRecording: audio.isRecording,
     isPlaying: audio.isPlaying,
     receivedCount: audios.length,
     unreadCount: audios.filter(a => !a.isRead).length,
     config
   });
+});
+
+app.get('/api/qr-image', async (req, res) => {
+  if (!whatsapp.qrCode) {
+    return res.status(404).send('No hay código QR disponible');
+  }
+  try {
+    const buffer = await QRCode.toBuffer(whatsapp.qrCode, { margin: 1, width: 300 });
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buffer);
+  } catch (e) {
+    res.status(500).send(e.message);
+  }
 });
 
 app.get('/api/groups', async (req, res) => {

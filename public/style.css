@@ -168,9 +168,11 @@ body {
   justify-content: center;
 }
 
-.qr-wrapper canvas {
+.qr-wrapper canvas, .qr-wrapper img {
   width: 100% !important;
   height: 100% !important;
+  object-fit: contain;
+  display: block;
 }
 
 .qr-hint {
