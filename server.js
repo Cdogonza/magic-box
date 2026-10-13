@@ -280,8 +280,6 @@ app.post('/api/upload-voice', express.raw({ type: '*/*', limit: '15mb' }), async
 
     if (whatsapp.isConnected) {
       await whatsapp.sendVoiceNote(tempPath);
-      // Suena el efecto de envío tras confirmación
-      await audio.playSoundEffect('sent');
       console.log('✓ Audio enviado exitosamente a WhatsApp desde el navegador!');
       res.json({ success: true, sent: true });
     } else {
