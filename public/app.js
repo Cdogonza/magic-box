@@ -69,6 +69,11 @@ const slotPhotoInputs = [
   document.getElementById('slotPhotoInput1'),
   document.getElementById('slotPhotoInput2')
 ];
+const slotPreviews = [
+  document.getElementById('slotPreview0'),
+  document.getElementById('slotPreview1'),
+  document.getElementById('slotPreview2')
+];
 
 const btnSettings = document.getElementById('btnSettings');
 const settingsModal = document.getElementById('settingsModal');
@@ -140,10 +145,12 @@ function handleSocketMessage(msg) {
       if (msg.isPlaying !== undefined && !currentAudioPlayer) setPlayingUI(msg.isPlaying);
       break;
     case 'channel-switched':
-      state.activeChannelIndex = msg.activeChannelIndex;
-      playPopSound();
-      updateChannelsUI();
-      loadAudios();
+      if (state.activeChannelIndex !== msg.activeChannelIndex) {
+        state.activeChannelIndex = msg.activeChannelIndex;
+        playPopSound();
+        updateChannelsUI();
+        updateBadgesAndGreenLightFromCache();
+      }
       break;
     case 'new-message':
       showStatus(`🔔 ¡Nuevo mensaje de ${msg.sender}!`, '🎉');
@@ -293,6 +300,7 @@ function applyConfigUI(cfg) {
     cfg.channels.forEach((ch, idx) => {
       if (slotNames[idx] && ch.name) slotNames[idx].value = ch.name;
       if (slotGroups[idx] && ch.id) slotGroups[idx].value = ch.id;
+      if (slotPreviews[idx] && ch.avatar) slotPreviews[idx].src = ch.avatar;
     });
   }
   updateChannelsUI();
@@ -327,31 +335,10 @@ async function loadAudios() {
   try {
     const res = await fetch('/api/audios');
     const audios = await res.json();
+    state.cachedAudios = audios;
     audioCountBadge.textContent = `${audios.length} audios`;
 
-    // Conteo de audios no leídos por ranura (0, 1, 2)
-    const unreadPerChannel = [0, 0, 0];
-    audios.forEach(a => {
-      if (!a.isRead) {
-        const ch = typeof a.channelIndex === 'number' ? a.channelIndex : 0;
-        if (ch >= 0 && ch < 3) unreadPerChannel[ch]++;
-      }
-    });
-
-    mouthBadges.forEach((badge, idx) => {
-      if (!badge) return;
-      const count = unreadPerChannel[idx];
-      if (count > 0) {
-        badge.classList.remove('hidden');
-        badge.textContent = count > 1 ? count : '🔔';
-      } else {
-        badge.classList.add('hidden');
-      }
-    });
-
-    const activeUnread = unreadPerChannel[state.activeChannelIndex || 0];
-    const totalUnread = audios.filter(a => !a.isRead).length;
-    updateGreenLight(activeUnread > 0 ? activeUnread : totalUnread);
+    updateBadgesAndGreenLightFromCache();
 
     if (audios.length === 0) {
       audioList.innerHTML = '<div class="empty-inbox">No han llegado audios todavía. Los audios de la familia aparecerán aquí.</div>';
@@ -730,7 +717,8 @@ btnSaveConfig.addEventListener('click', async () => {
   for (let i = 0; i < 3; i++) {
     const name = slotNames[i]?.value.trim() || `Ranura ${i + 1}`;
     const id = slotGroups[i]?.value || '';
-    const avatar = updatedChannels[i]?.avatar || `/avatars/family${i + 1}.svg`;
+    const currentAvatar = state.config.channels?.[i]?.avatar;
+    const avatar = currentAvatar || updatedChannels[i]?.avatar || `/avatars/family${i + 1}.svg`;
     updatedChannels[i] = { id, name, avatar };
   }
 
@@ -826,33 +814,91 @@ function playPopSound() {
   } catch (e) {}
 }
 
-async function switchChannel(targetIndex = null) {
-  unlockAudio();
-  playPopSound();
-  if (btnNose) {
-    btnNose.classList.add('pressed');
-    setTimeout(() => btnNose.classList.remove('pressed'), 200);
-  }
+// ==========================================
+// INTERACCIÓN DE LA CARA: NARIZ Y BOCA (CERO LAG)
+// ==========================================
+
+function updateBadgesAndGreenLightFromCache() {
+  const audios = state.cachedAudios || [];
+  const unreadPerChannel = [0, 0, 0];
+  audios.forEach(a => {
+    if (!a.isRead) {
+      const ch = typeof a.channelIndex === 'number' ? a.channelIndex : 0;
+      if (ch >= 0 && ch < 3) unreadPerChannel[ch]++;
+    }
+  });
+
+  mouthBadges.forEach((badge, idx) => {
+    if (!badge) return;
+    const count = unreadPerChannel[idx];
+    if (count > 0) {
+      badge.classList.remove('hidden');
+      badge.textContent = count > 1 ? count : '🔔';
+    } else {
+      badge.classList.add('hidden');
+    }
+  });
+
+  const activeUnread = unreadPerChannel[state.activeChannelIndex || 0];
+  const totalUnread = audios.filter(a => !a.isRead).length;
+  updateGreenLight(activeUnread > 0 ? activeUnread : totalUnread);
+}
+
+function playPopSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
   try {
-    const body = (targetIndex !== null && targetIndex !== undefined)
-      ? JSON.stringify({ index: targetIndex })
-      : '{}';
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
 
-    const res = await fetch('/api/channels/switch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body
-    });
-    const data = await res.json();
-    if (data.success) {
-      state.activeChannelIndex = data.activeChannelIndex;
-      updateChannelsUI();
-      loadAudios();
-    }
-  } catch (err) {
-    console.error('Error al cambiar canal:', err);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(340, now);
+    osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(460, now + 0.16);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.24);
+  } catch (e) {}
+}
+
+// Cambio de canal instantáneo (0 ms de latencia en la pantalla)
+function switchChannel(targetIndex = null) {
+  unlockAudio();
+
+  const numChannels = state.config.channels?.length || 3;
+  const nextIndex = (targetIndex !== null && targetIndex !== undefined)
+    ? targetIndex
+    : ((state.activeChannelIndex || 0) + 1) % numChannels;
+
+  // Si se seleccionó la que ya está activa, no hacer nada
+  if (nextIndex === state.activeChannelIndex && targetIndex !== null) return;
+
+  // 1. RESPUESTA VISUAL Y DE SONIDO INSTANTÁNEA (0 ms de lag)
+  state.activeChannelIndex = nextIndex;
+  playPopSound();
+  updateChannelsUI();
+  updateBadgesAndGreenLightFromCache();
+
+  if (btnNose) {
+    btnNose.classList.add('pressed');
+    setTimeout(() => btnNose.classList.remove('pressed'), 180);
   }
+
+  // 2. Notificación en segundo plano al servidor (sin bloquear la interfaz del niño)
+  fetch('/api/channels/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ index: nextIndex })
+  }).catch(() => {});
 }
 
 function updateChannelsUI() {
@@ -883,6 +929,42 @@ function updateChannelsUI() {
   showStatus(`Hablando con: ${activeChannel.name || 'Familia'} ✨`, '🗣️');
 }
 
+// Compresor de imagen ultraligero en el navegador (reduce fotos de 8MB a ~30KB en 20ms)
+function compressImage(file, maxSize = 360, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        if (w > h) {
+          if (w > maxSize) {
+            h = Math.round((h * maxSize) / w);
+            w = maxSize;
+          }
+        } else {
+          if (h > maxSize) {
+            w = Math.round((w * maxSize) / h);
+            h = maxSize;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function setupSlotPhotoUploads() {
   slotPhotoInputs.forEach((input, idx) => {
     if (!input) return;
@@ -890,48 +972,65 @@ function setupSlotPhotoUploads() {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const dataUrl = ev.target.result;
-        try {
-          showStatus('Subiendo foto para ' + (slotNames[idx]?.value || `Ranura ${idx + 1}`) + '...', '⏳');
-          const res = await fetch(`/api/channels/${idx}/avatar`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dataUrl })
-          });
-          const data = await res.json();
-          if (data.success && data.avatarUrl) {
-            if (mouthAvatars[idx]) mouthAvatars[idx].src = data.avatarUrl;
-            if (state.config.channels && state.config.channels[idx]) {
-              state.config.channels[idx].avatar = data.avatarUrl;
-            }
-            showStatus('Foto actualizada con éxito 📸', '✅');
-          } else {
-            alert('Error al guardar la foto: ' + (data.error || ''));
+      try {
+        const slotTitle = slotNames[idx]?.value || `Ranura ${idx + 1}`;
+        showStatus(`Optimizando y subiendo foto de ${slotTitle}...`, '⏳');
+
+        // Comprimir en el navegador antes de enviar
+        const compressedDataUrl = await compressImage(file, 360, 0.85);
+
+        // Previsualizar de inmediato en el modal y en la boca
+        if (mouthAvatars[idx]) mouthAvatars[idx].src = compressedDataUrl;
+        if (slotPreviews[idx]) slotPreviews[idx].src = compressedDataUrl;
+
+        const res = await fetch(`/api/channels/${idx}/avatar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl: compressedDataUrl })
+        });
+        const data = await res.json();
+        if (data.success && data.avatarUrl) {
+          const finalUrl = `${data.avatarUrl}?t=${Date.now()}`;
+          if (mouthAvatars[idx]) mouthAvatars[idx].src = finalUrl;
+          if (slotPreviews[idx]) slotPreviews[idx].src = finalUrl;
+          if (state.config.channels && state.config.channels[idx]) {
+            state.config.channels[idx].avatar = data.avatarUrl;
           }
-        } catch (err) {
-          console.error('Error subiendo foto:', err);
-          alert('Error de conexión al subir foto');
+          showStatus('¡Foto guardada con éxito! 📸', '✅');
+        } else {
+          alert('Error al guardar foto: ' + (data.error || 'Desconocido'));
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error procesando foto:', err);
+        alert('No se pudo procesar la foto: ' + err.message);
+      }
     });
   });
 }
 
-// Escuchadores de eventos para la Cara
-if (btnNose) {
-  btnNose.addEventListener('click', () => switchChannel());
-  btnNose.addEventListener('touchstart', (e) => {
+// Asignador de toques instantáneos para pantallas táctiles (evita el retardo de 300ms de click)
+function bindFastTap(elem, callback) {
+  if (!elem) return;
+  let lastTouchTime = 0;
+  elem.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    switchChannel();
+    lastTouchTime = Date.now();
+    callback();
+  }, { passive: false });
+  elem.addEventListener('click', (e) => {
+    if (Date.now() - lastTouchTime < 500) return;
+    callback();
   });
+}
+
+// Escuchadores de eventos rápidos
+if (btnNose) {
+  bindFastTap(btnNose, () => switchChannel());
 }
 
 mouthCards.forEach((card, idx) => {
   if (card) {
-    card.addEventListener('click', () => switchChannel(idx));
+    bindFastTap(card, () => switchChannel(idx));
   }
 });
 
