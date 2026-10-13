@@ -5,7 +5,11 @@ import fs from 'node:fs';
 import readline from 'node:readline';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'node:url';
-import QRCode from 'qrcode';
+
+let QRCode = null;
+try {
+  QRCode = (await import('qrcode')).default;
+} catch (e) {}
 
 import AudioManager from './lib/audio.js';
 import WhatsAppClient from './lib/whatsapp.js';
@@ -130,6 +134,9 @@ app.get('/api/status', async (req, res) => {
 app.get('/api/qr-image', async (req, res) => {
   if (!whatsapp.qrCode) {
     return res.status(404).send('No hay código QR disponible');
+  }
+  if (!QRCode) {
+    return res.status(503).send('QRCode no instalado. Ejecuta npm install');
   }
   try {
     const buffer = await QRCode.toBuffer(whatsapp.qrCode, { margin: 1, width: 300 });
