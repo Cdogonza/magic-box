@@ -1,4 +1,3 @@
-// Estado local
 let state = {
   connected: false,
   isRecording: false,
@@ -6,6 +5,45 @@ let state = {
   buttonMode: 'toggle', // 'hold' o 'toggle'
   config: {}
 };
+
+// ==========================================
+// MÁQUINA DE ESTADOS Y RESILIENCIA (Anti-Saturación / Niños)
+// ==========================================
+const UIState = {
+  IDLE: 'IDLE',
+  RECORDING: 'RECORDING',
+  SENDING: 'SENDING',
+  PLAYING: 'PLAYING'
+};
+let currentUIState = UIState.IDLE;
+let lastActionTimestamp = 0;
+let recordingWatchdogTimer = null;
+let sendingWatchdogTimer = null;
+let noseEmergencyTaps = [];
+
+function isActionDebounced(cooldownMs = 280) {
+  const now = Date.now();
+  if (now - lastActionTimestamp < cooldownMs) return true;
+  lastActionTimestamp = now;
+  return false;
+}
+
+// Gesto de emergencia físico: 5 toques rápidos en la Nariz en < 2 segundos
+function checkNoseEmergency() {
+  const now = Date.now();
+  noseEmergencyTaps = noseEmergencyTaps.filter(t => now - t < 2000);
+  noseEmergencyTaps.push(now);
+  if (noseEmergencyTaps.length >= 5) {
+    noseEmergencyTaps = [];
+    console.warn('[Watchdog] 🚨 Gesto de emergencia detectado en la Nariz. Reiniciando pantalla...');
+    playPopSound();
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 350);
+    return true;
+  }
+  return false;
+}
 
 // Elementos DOM
 const connectionBadge = document.getElementById('connectionBadge');
@@ -516,6 +554,10 @@ async function playAudioFile(audioUrl) {
 // ACCIÓN BOTÓN VERDE: ESCUCHAR
 // ==========================================
 async function handleListenAction() {
+  if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
+  if (isActionDebounced()) return;
+  currentUIState = UIState.PLAYING;
+
   unlockAudio();
   btnListen.classList.add('pressed');
 
@@ -543,17 +585,12 @@ async function handleListenAction() {
     btnListen.classList.remove('pressed');
     setPlayingUI(false);
     showStatus('Error de conexión', '❌');
+  } finally {
+    if (currentUIState === UIState.PLAYING) {
+      currentUIState = UIState.IDLE;
+    }
   }
 }
-
-btnListen.addEventListener('click', () => {
-  handleListenAction();
-});
-
-btnListen.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  handleListenAction();
-});
 
 // ==========================================
 // ACCIÓN BOTÓN ROJO: GRABAR Y ENVIAR
@@ -572,7 +609,9 @@ async function initMicrophone() {
 }
 
 async function startRecording() {
-  if (state.isRecording) return;
+  if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
+  if (isActionDebounced()) return;
+  currentUIState = UIState.RECORDING;
 
   try {
     const stream = await initMicrophone();
@@ -595,15 +634,29 @@ async function startRecording() {
     };
 
     mediaRecorder.onstop = async () => {
+      clearTimeout(recordingWatchdogTimer);
       const duration = (Date.now() - recordStartTime) / 1000;
       setRecordingUI(false);
 
       if (duration < 1.0) {
+        currentUIState = UIState.IDLE;
         showStatus('Audio muy cortito, descartado', '⚠️');
         return;
       }
 
+      currentUIState = UIState.SENDING;
       showStatus('Enviando audio al grupo...', '🚀');
+
+      // Watchdog de envío (8s): libera la interfaz si el envío por red se traba
+      clearTimeout(sendingWatchdogTimer);
+      sendingWatchdogTimer = setTimeout(() => {
+        if (currentUIState === UIState.SENDING) {
+          console.warn('[Watchdog] Envío tardó más de 8s, liberando UI.');
+          currentUIState = UIState.IDLE;
+          setRecordingUI(false);
+        }
+      }, 8000);
+
       const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
 
       try {
@@ -623,6 +676,9 @@ async function startRecording() {
       } catch (err) {
         console.error('Error subiendo audio:', err);
         showStatus('Error al enviar audio: ' + (err.message || 'conexión'), '❌');
+      } finally {
+        clearTimeout(sendingWatchdogTimer);
+        currentUIState = UIState.IDLE;
       }
     };
 
@@ -632,19 +688,32 @@ async function startRecording() {
     mediaRecorder.start(200);
     setRecordingUI(true);
 
+    // Watchdog de grabación (máximo 30 segundos)
+    clearTimeout(recordingWatchdogTimer);
+    recordingWatchdogTimer = setTimeout(() => {
+      if (currentUIState === UIState.RECORDING) {
+        console.warn('[Watchdog] Grabación superó 30 segundos, cortando.');
+        stopRecording();
+      }
+    }, 30000);
+
   } catch (err) {
     console.error('Permiso de micrófono denegado:', err);
+    currentUIState = UIState.IDLE;
+    setRecordingUI(false);
     alert('Por favor permite el acceso al micrófono en el navegador para poder grabar.');
   }
 }
 
 function stopRecording() {
+  clearTimeout(recordingWatchdogTimer);
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     mediaRecorder.stop();
   }
 }
 
 function handleRecordTrigger() {
+  if (currentUIState === UIState.SENDING) return;
   if (state.buttonMode === 'toggle') {
     if (state.isRecording) {
       stopRecording();
@@ -873,6 +942,7 @@ function playPopSound() {
 
 // Cambio de canal instantáneo (0 ms de latencia en la pantalla)
 function switchChannel(targetIndex = null) {
+  if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
   unlockAudio();
 
   const numChannels = state.config.channels?.length || 3;
@@ -1025,17 +1095,51 @@ function bindFastTap(elem, callback) {
 }
 
 // Escuchadores de eventos rápidos
+if (btnListen) {
+  bindFastTap(btnListen, () => handleListenAction());
+}
+
 if (btnNose) {
-  bindFastTap(btnNose, () => switchChannel());
+  bindFastTap(btnNose, () => {
+    if (checkNoseEmergency()) return;
+    if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
+    if (isActionDebounced()) return;
+    switchChannel();
+  });
 }
 
 mouthCards.forEach((card, idx) => {
   if (card) {
-    bindFastTap(card, () => switchChannel(idx));
+    bindFastTap(card, () => {
+      if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
+      if (isActionDebounced()) return;
+      switchChannel(idx);
+    });
   }
 });
 
 setupSlotPhotoUploads();
+
+// Latido periódico de salud (Heartbeat a /api/health)
+let healthFailures = 0;
+setInterval(async () => {
+  try {
+    const res = await fetch('/api/health');
+    if (res.ok) {
+      if (healthFailures > 0) {
+        healthFailures = 0;
+        setConnected(true);
+      }
+    } else {
+      healthFailures++;
+    }
+  } catch (e) {
+    healthFailures++;
+    if (healthFailures >= 4) {
+      setConnected(false);
+    }
+  }
+}, 15000);
 
 // Inicialización
 connectWebSocket();

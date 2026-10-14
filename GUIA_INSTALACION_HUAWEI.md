@@ -99,14 +99,54 @@ node server.js
 
 ---
 
-## 7. Automatizar el Inicio (Opcional)
+## 7. Puesta en Producción 24/7 (Autónoma y Desatendida)
 
-Si quieres que cada vez que el celular Huawei se encienda o reinicie la Caja Mágica empiece a funcionar sola:
-1. Instala **Termux:Boot** desde F-Droid.
-2. En Termux:
+Para que el celular funcione dentro de la caja sellada sin intervención humana:
+
+### A. Supervisor PM2 y Auto-Arranque en Boot
+Ejecuta el script automatizado dentro de la carpeta del proyecto en Termux:
+```bash
+bash setup-autostart.sh
+```
+Este script:
+1. Instala **PM2** (el gestor de procesos que revive `server.js` en 2 segundos si hay cualquier error o excepción).
+2. Configura **Termux:Boot** para que, al encender o reiniciar el teléfono, el servidor y la interfaz web arranquen solos.
+3. Puedes ver el estado de la caja en cualquier momento ejecutando: `pm2 status`
+
+---
+
+## 8. Mantener la Pantalla Siempre Encendida (Modo Kiosk)
+
+Dado que el celular estará sellado en la caja y los niños no deben ver barras de navegación:
+
+1. **Ajustes de Pantalla en Huawei:**
+   * Ve a **Ajustes** > **Pantalla** > **Reposo / Suspender** y selecciona **Nunca** (o activa *Opciones de Desarrollador* > *Pantalla siempre activa al cargar*).
+2. **Navegador Kiosk (Recomendado para producción):**
+   * Descarga e instala **Fully Kiosk Browser** (APK gratis en [fully-kiosk.com](https://www.fully-kiosk.com/)).
+   * Configura la URL inicial en: `http://localhost:3000`
+   * Activa:
+     - ✅ **Enable Kiosk Mode** (bloquea salir de la pantalla completa).
+     - ✅ **Keep Screen On** (la pantalla nunca se apaga mientras esté enchufada).
+     - ✅ **Auto-Reload on Network Error** (recarga la web automáticamente si hay desconexión).
+
+---
+
+## 9. Gesto Físico de Emergencia (Sin Abrir la Caja)
+
+Si por alguna razón la pantalla o el navegador sufren un bloqueo temporal debido a que un niño saturó los botones:
+* **Toca la NARIZ 5 veces seguidas rápidamente** (en menos de 2 segundos).
+* El sistema reproducirá un sonido de reinicio y **forzará la recarga completa de la interfaz** (`window.location.reload`), desbloqueando cualquier proceso colgado sin necesidad de desarmar la caja.
+
+---
+
+## 10. Auto-Encendido al Enchufar a la Pared (Auto-Boot on Charge)
+
+Si el celular llega a apagarse por corte de energía y quieres que al volver la corriente se encienda solo sin presionar el botón físico de encendido:
+
+1. Conecta el Huawei a una computadora por USB en modo Fastboot (`adb reboot bootloader` o manteniendo presionado *Volumen Abajo + Encendido* al conectar el cable).
+2. En la computadora ejecuta:
    ```bash
-   mkdir -p ~/.termux/boot
-   echo "cd ~/magic-Box && node server.js" > ~/.termux/boot/start-magicbox.sh
-   chmod +x ~/.termux/boot/start-magicbox.sh
+   fastboot oem off-mode-charge 0
    ```
-Ahora la caja es 100% autónoma: la enchufas a la pared y arranca sola.
+3. A partir de ese momento, en cuanto el cargador de pared reciba energía, el celular arrancará directamente a Android, ejecutará Termux:Boot, levantará PM2 y abrirá la pantalla de la Caja Mágica.
+

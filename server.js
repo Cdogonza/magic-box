@@ -18,6 +18,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const configFile = path.join(__dirname, 'config.json');
 
+// Protección global de proceso contra excepciones no capturadas
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Excepción no controlada en Node.js:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[WARN] Promesa rechazada no capturada en Node.js:', reason);
+});
+
 // Cargar configuración
 let config = {
   targetGroupName: '',
@@ -201,6 +210,22 @@ app.post('/api/audios/clear', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ENDPOINT DE SALUD Y MONITOREO (Para Watchdogs y PM2)
+app.get('/api/health', (req, res) => {
+  const mem = process.memoryUsage();
+  res.json({
+    status: 'ok',
+    uptime: Math.floor(process.uptime()),
+    connected: whatsapp.isConnected,
+    activeChannelIndex: config.activeChannelIndex,
+    channelsConfigured: (config.channels || []).filter(c => Boolean(c.id)).length,
+    memoryMb: {
+      rss: Math.round(mem.rss / (1024 * 1024)),
+      heapUsed: Math.round(mem.heapUsed / (1024 * 1024))
+    }
+  });
 });
 
 app.post('/api/logout', async (req, res) => {
@@ -423,4 +448,10 @@ server.listen(PORT, '0.0.0.0', () => {
   whatsapp.initialize().catch(err => {
     console.error('[WhatsApp] Error al inicializar:', err);
   });
+
+  // Mantenimiento de almacenamiento: purga inicial y cada 6 horas
+  audio.cleanupStorage();
+  setInterval(() => {
+    audio.cleanupStorage();
+  }, 6 * 60 * 60 * 1000);
 });
