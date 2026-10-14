@@ -158,16 +158,14 @@ function handleSocketMessage(msg) {
       if (typeof msg.channelIndex === 'number') {
         if (mouthBadges[msg.channelIndex]) mouthBadges[msg.channelIndex].classList.remove('hidden');
         if (mouthCards[msg.channelIndex]) mouthCards[msg.channelIndex].classList.add('has-unread');
-      }
-      if (msg.unreadCount !== undefined) {
-        updateGreenLight(msg.unreadCount);
+        // Solo encender luz verde si el mensaje recibido pertenece al grupo activo actualmente
+        if (msg.channelIndex === (state.activeChannelIndex || 0)) {
+          updateGreenLight(1);
+        }
       }
       loadAudios();
       break;
     case 'unread-update':
-      if (msg.unreadCount !== undefined) {
-        updateGreenLight(msg.unreadCount);
-      }
       loadAudios();
       break;
     case 'groups':
@@ -276,7 +274,6 @@ async function loadStatus() {
     }
     state.config = data.config || {};
     applyConfigUI(state.config);
-    updateGreenLight(data.unreadCount || 0);
     setRecordingUI(data.isRecording || false);
     if (data.ffmpegAvailable === false) {
       showStatus('⚠️ FFmpeg requiere actualización en Termux: corre pkg upgrade', '⚙️');
@@ -844,9 +841,8 @@ function updateBadgesAndGreenLightFromCache() {
     }
   });
 
-  const activeUnread = unreadPerChannel[state.activeChannelIndex || 0];
-  const totalUnread = audios.filter(a => !a.isRead).length;
-  updateGreenLight(activeUnread > 0 ? activeUnread : totalUnread);
+  const activeUnread = unreadPerChannel[state.activeChannelIndex || 0] || 0;
+  updateGreenLight(activeUnread);
 }
 
 function playPopSound() {
