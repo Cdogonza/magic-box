@@ -134,14 +134,131 @@ html, body {
   transform: scale(0.93) translateY(3px);
 }
 
-/* Símbolo gigante y centrado (sin texto) */
+/* Símbolo de respaldo (oculto) */
 .eye-btn .btn-emoji {
-  font-size: clamp(3.2rem, 16vh, 5.5rem);
-  line-height: 1;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
-  transition: transform 0.2s ease, filter 0.3s ease;
-  z-index: 2;
+  display: none;
+}
+
+/* ========================================================
+   ESTILO CARTOON PIXAR: OJOS ANIMADOS CON PESTAÑEO
+   ======================================================== */
+.cartoon-eye {
+  position: relative;
+  width: clamp(75px, 25vh, 130px);
+  height: clamp(75px, 25vh, 130px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #f8fafc 55%, #cbd5e1 100%);
+  box-shadow: 
+    inset 0 3px 8px rgba(0, 0, 0, 0.28),
+    inset 0 -3px 6px rgba(255, 255, 255, 0.95),
+    0 8px 22px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transform-origin: center center;
+  animation: cartoonBlink 4.2s infinite cubic-bezier(0.77, 0, 0.175, 1);
   pointer-events: none;
+  z-index: 2;
+  transition: transform 0.2s ease, filter 0.3s ease;
+}
+
+/* Ciclo de pestañeo natural (abierto 90% del tiempo, cierre y apertura de 140ms) */
+@keyframes cartoonBlink {
+  0%, 90%, 100% {
+    transform: scaleY(1);
+  }
+  93% {
+    transform: scaleY(0.06);
+  }
+  95.5% {
+    transform: scaleY(1);
+  }
+}
+
+.cartoon-eye .eye-sclera {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Pliegue superior del párpado (profundidad cartoon) */
+.eye-eyelid-crease {
+  position: absolute;
+  top: 8%;
+  width: 68%;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* IRIS */
+.eye-iris {
+  position: relative;
+  width: 64%;
+  height: 64%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    inset 0 3px 8px rgba(0, 0, 0, 0.55),
+    0 2px 5px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s ease, filter 0.3s ease;
+}
+
+/* Iris Verde (Botón Escuchar) */
+.iris-green {
+  background: radial-gradient(circle at 32% 30%, #a7f3d0 0%, #10b981 35%, #059669 70%, #064e3b 100%);
+  border: 2px solid rgba(6, 78, 59, 0.55);
+}
+
+/* Iris Rojo (Botón Hablar) */
+.iris-red {
+  background: radial-gradient(circle at 32% 30%, #fecdd3 0%, #fb7185 35%, #e11d48 70%, #4c0519 100%);
+  border: 2px solid rgba(136, 19, 55, 0.55);
+}
+
+/* PUPILA */
+.eye-pupil {
+  position: relative;
+  width: 58%;
+  height: 58%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #27272a 0%, #09090b 70%, #000000 100%);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.85);
+  transition: transform 0.2s ease;
+}
+
+/* BRILLOS / CATCHLIGHTS ESTILO PIXAR */
+.eye-sparkle {
+  position: absolute;
+  border-radius: 50%;
+  background: #ffffff;
+  pointer-events: none;
+}
+
+/* Destello principal grande (arriba derecha) */
+.sparkle-main {
+  width: 36%;
+  height: 36%;
+  top: 13%;
+  right: 16%;
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.95);
+}
+
+/* Destello secundario pequeño (abajo izquierda) */
+.sparkle-sub {
+  width: 16%;
+  height: 16%;
+  bottom: 17%;
+  left: 20%;
+  opacity: 0.88;
 }
 
 /* Indicador LED en esquina del ojo */
@@ -202,6 +319,23 @@ html, body {
   transform: scale(1.3);
 }
 
+.btn-listen.is-lit .cartoon-eye {
+  filter: drop-shadow(0 0 16px rgba(52, 211, 153, 0.95));
+}
+
+.btn-listen.is-lit .iris-green {
+  animation: irisThrob 1.8s infinite alternate ease-in-out;
+}
+
+.btn-listen.pressed .cartoon-eye {
+  transform: scale(0.95);
+}
+
+@keyframes irisThrob {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.08); filter: brightness(1.22); }
+}
+
 @keyframes pulseGreenBeacon {
   0% {
     box-shadow: 0 0 30px rgba(16, 185, 129, 0.7), 0 10px 24px rgba(16, 185, 129, 0.4);
@@ -255,6 +389,16 @@ html, body {
   border-color: #ffffff;
   box-shadow: 0 0 16px #ff1744, 0 0 28px #ff5252;
   transform: scale(1.3);
+}
+
+.btn-record.recording .cartoon-eye {
+  animation: none !important;
+  transform: scale(1.06) !important;
+  filter: drop-shadow(0 0 16px rgba(244, 63, 94, 0.95));
+}
+
+.btn-record.recording .eye-pupil {
+  transform: scale(1.18);
 }
 
 @keyframes pulseRedBeacon {

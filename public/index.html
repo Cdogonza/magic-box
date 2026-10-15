@@ -36,13 +36,28 @@
         <span id="statusMessage"></span>
       </div>
 
-      <!-- 1. LOS OJOS: Botón Verde (Escuchar) y Botón Rojo (Hablar) - CUADRADOS, SÓLO SÍMBOLOS -->
+      <!-- 1. LOS OJOS: Ojo Verde (Escuchar) y Ojo Rojo (Hablar) - CARTOON PIXAR ANIMADOS -->
       <div class="face-eyes-row">
         <!-- OJO IZQUIERDO: ESCUCHAR -->
         <button id="btnListen" class="eye-btn btn-listen" type="button" title="Escuchar audios">
           <div class="btn-glow"></div>
           <div class="light-indicator" id="greenLightIndicator"></div>
-          <span class="btn-emoji" id="listenEmoji">👂</span>
+          
+          <!-- Ojo Cartoon Pixar Izquierdo (Verde) -->
+          <div class="cartoon-eye eye-left" id="cartoonEyeLeft">
+            <div class="eye-sclera">
+              <div class="eye-iris iris-green">
+                <div class="eye-pupil">
+                  <div class="eye-sparkle sparkle-main"></div>
+                  <div class="eye-sparkle sparkle-sub"></div>
+                </div>
+              </div>
+            </div>
+            <div class="eye-eyelid-crease"></div>
+          </div>
+
+          <!-- Elementos conservados para compatibilidad JS -->
+          <span class="btn-emoji hidden" id="listenEmoji" style="display: none;">👂</span>
           <span class="hidden" id="unreadBadgeText" style="display: none;"></span>
         </button>
 
@@ -50,11 +65,26 @@
         <button id="btnRecord" class="eye-btn btn-record" type="button" title="Grabar mensaje">
           <div class="btn-glow"></div>
           <div class="light-indicator" id="redLightIndicator"></div>
-          <span class="btn-emoji" id="recordEmoji">🎙️</span>
+          
+          <!-- Ojo Cartoon Pixar Derecho (Rojo) -->
+          <div class="cartoon-eye eye-right" id="cartoonEyeRight">
+            <div class="eye-sclera">
+              <div class="eye-iris iris-red">
+                <div class="eye-pupil">
+                  <div class="eye-sparkle sparkle-main"></div>
+                  <div class="eye-sparkle sparkle-sub"></div>
+                </div>
+              </div>
+            </div>
+            <div class="eye-eyelid-crease"></div>
+          </div>
+
           <!-- Onda animada de voz cuando graba -->
           <div class="sound-waves hidden" id="soundWaves">
             <span></span><span></span><span></span><span></span><span></span>
           </div>
+          <!-- Elementos conservados para compatibilidad JS -->
+          <span class="btn-emoji hidden" id="recordEmoji" style="display: none;">🎙️</span>
           <span class="hidden" id="recordTitle" style="display: none;"></span>
           <span class="hidden" id="recordSub" style="display: none;"></span>
         </button>
