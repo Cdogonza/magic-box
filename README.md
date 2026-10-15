@@ -33,7 +33,7 @@ magic-Box/
 │   ├── app.js
 │   └── style.css
 ├── sounds/                    # Efectos de sonido generados
-├── GUIA_INSTALACION_HUAWEI.md # Guía paso a paso para configurar tu celular Huawei
+├── GUIA_INSTALACION_HUAWEI.md # Guía paso a paso por marca (Samsung, Xiaomi, Huawei, Motorola)
 └── README.md
 ```
 
@@ -68,9 +68,9 @@ Para probarlo y ver cómo funciona antes de pasarlo al celular:
 
 ---
 
-## 📱 Instalación en el Celular Huawei con Termux
+## 📱 Instalación en el Celular Android con Termux
 
-Para dejar la solución definitiva corriendo adentro de la caja con el celular Huawei, consulta la guía dedicada:
+Para dejar la solución definitiva corriendo adentro de la caja de forma autónoma (Samsung, Xiaomi, Huawei, Motorola), consulta la guía dedicada paso a paso:
 
 👉 **[GUIA_INSTALACION_HUAWEI.md](file:///Users/gonzalopaz/Desktop/magic-Box/GUIA_INSTALACION_HUAWEI.md)**
 
