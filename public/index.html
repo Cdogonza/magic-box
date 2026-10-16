@@ -11,6 +11,29 @@
 </head>
 <body>
   <div class="app-container">
+    <!-- PANTALLA DE BIENVENIDA / DESPERTAR DE LA CAJA MÁGICA -->
+    <div id="welcomeScreen" class="welcome-overlay">
+      <div class="welcome-floating-stars">
+        <span class="w-star w-star-1">✨</span>
+        <span class="w-star w-star-2">⭐</span>
+        <span class="w-star w-star-3">🌟</span>
+        <span class="w-star w-star-4">✨</span>
+      </div>
+
+      <div class="welcome-center-box">
+        <button id="btnStartGame" class="welcome-start-btn" type="button" title="Toca para despertar la Caja Mágica">
+          <div class="welcome-btn-glow"></div>
+          <div class="welcome-btn-inner">
+            <span class="welcome-btn-icon">🚀</span>
+            <div class="welcome-btn-text-col">
+              <span class="welcome-btn-label">¡INICIAR!</span>
+              <span class="welcome-btn-sub">Toca para despertar ✨</span>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+
     <!-- Botón discreto de configuración en el vértice superior derecho -->
     <button id="btnSettings" class="corner-settings-btn" type="button" title="Configuración">⚙️</button>
     <div id="connectionBadge" class="hidden"><span id="connectionText"></span></div>
@@ -92,10 +115,20 @@
 
       <!-- 2. LA NARIZ: Botón Switcher central para cambiar de grupo (CUADRADO, SÓLO ICONO) -->
       <div class="face-nose-wrapper">
+        <!-- Sonrojo de mejillas interactivo (Cosquillas / Alegría) -->
+        <div class="face-blush blush-left" id="blushLeft"></div>
+
         <button id="btnNose" class="nose-btn" type="button" title="Toca la nariz para cambiar a quién le hablas">
           <div class="nose-glow"></div>
           <span class="nose-emoji">👃</span>
         </button>
+
+        <div class="face-blush blush-right" id="blushRight"></div>
+
+        <!-- Burbuja flotante de Zzz para el Modo Siesta -->
+        <div id="sleepZzzContainer" class="sleep-zzz-container hidden">
+          <span class="zzz-cloud">💤 Zzz...</span>
+        </div>
       </div>
 
       <!-- 3. LA BOCA: Fila de 3 marcos CUADRADOS con fotos de los grupos familiares -->
@@ -103,7 +136,7 @@
         <!-- Ranura 0 -->
         <div class="channel-card is-active" data-index="0" id="channelCard0" title="Toca para elegir">
           <div class="channel-avatar-wrapper">
-            <img class="channel-avatar-img" id="channelAvatar0" src="/avatars/family1.svg" alt="Papá y Mamá" />
+            <img class="channel-avatar-img" id="channelAvatar0" src="avatars/family1.svg" alt="" />
             <span class="channel-unread-dot hidden" id="channelBadge0">🔔</span>
           </div>
           <span class="channel-name-tag" id="channelName0">Papá y Mamá</span>
@@ -112,7 +145,7 @@
         <!-- Ranura 1 -->
         <div class="channel-card" data-index="1" id="channelCard1" title="Toca para elegir">
           <div class="channel-avatar-wrapper">
-            <img class="channel-avatar-img" id="channelAvatar1" src="/avatars/family2.svg" alt="Abuelos Paternos" />
+            <img class="channel-avatar-img" id="channelAvatar1" src="avatars/family2.svg" alt="" />
             <span class="channel-unread-dot hidden" id="channelBadge1">🔔</span>
           </div>
           <span class="channel-name-tag" id="channelName1">Abuelos Paternos</span>
@@ -121,11 +154,14 @@
         <!-- Ranura 2 -->
         <div class="channel-card" data-index="2" id="channelCard2" title="Toca para elegir">
           <div class="channel-avatar-wrapper">
-            <img class="channel-avatar-img" id="channelAvatar2" src="/avatars/family3.svg" alt="Abuelos Maternos" />
+            <img class="channel-avatar-img" id="channelAvatar2" src="avatars/family3.svg" alt="" />
             <span class="channel-unread-dot hidden" id="channelBadge2">🔔</span>
           </div>
           <span class="channel-name-tag" id="channelName2">Abuelos Maternos</span>
         </div>
+
+        <!-- Lengüita rosada de caricatura en el fondo de la boca sonriente -->
+        <div class="mouth-tongue"></div>
       </div>
     </main>
 
