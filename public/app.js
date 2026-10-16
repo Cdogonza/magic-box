@@ -33,6 +33,8 @@ function checkNoseEmergency() {
   const now = Date.now();
   noseEmergencyTaps = noseEmergencyTaps.filter(t => now - t < 2000);
   noseEmergencyTaps.push(now);
+
+  // 1. Rescate: 5 toques en < 2 segundos
   if (noseEmergencyTaps.length >= 5) {
     noseEmergencyTaps = [];
     console.warn('[Watchdog] 🚨 Gesto de emergencia detectado en la Nariz. Reiniciando pantalla...');
@@ -42,6 +44,12 @@ function checkNoseEmergency() {
     }, 350);
     return true;
   }
+
+  // 2. Cosquillas en la Nariz: 2 o 3 toques rápidos
+  if (noseEmergencyTaps.length === 2 || noseEmergencyTaps.length === 3) {
+    triggerNoseTickle();
+  }
+
   return false;
 }
 
@@ -126,7 +134,13 @@ const webSounds = {
   ding: new Audio('/sounds/ding.wav'),
   beep: new Audio('/sounds/beep.wav'),
   sent: new Audio('/sounds/sent.wav'),
-  empty: new Audio('/sounds/empty.wav')
+  empty: new Audio('/sounds/empty.wav'),
+  welcome: new Audio('/sounds/welcome.wav'),
+  giggle: new Audio('/sounds/giggle.wav'),
+  yawn: new Audio('/sounds/yawn.wav'),
+  sentWhistle: new Audio('/sounds/sent_whistle.wav'),
+  sentPop: new Audio('/sounds/sent_pop.wav'),
+  sentYupi: new Audio('/sounds/sent_yupi.wav')
 };
 
 // Reproductor HTML5 activo para audios de WhatsApp
@@ -277,6 +291,7 @@ function setRecordingUI(isRecording) {
     if (recordSub) recordSub.textContent = state.buttonMode === 'hold' ? 'Suelta para enviar' : 'Toca para enviar';
     if (recordEmoji) recordEmoji.textContent = '🎙️';
     if (soundWaves) soundWaves.classList.remove('hidden');
+    setEyeGaze('gaze-toward-red', 0);
     showStatus('¡Luz roja encendida! Grabando tu voz...', '🎙️');
   } else {
     btnRecord.classList.remove('is-lit', 'recording');
@@ -284,22 +299,29 @@ function setRecordingUI(isRecording) {
     if (recordSub) recordSub.textContent = state.buttonMode === 'hold' ? 'Mantén para hablar' : 'Toca para hablar';
     if (recordEmoji) recordEmoji.textContent = '🎙️';
     if (soundWaves) soundWaves.classList.add('hidden');
+    setEyeGaze('center', 0);
   }
 }
 
 function setPlayingUI(isPlaying) {
   state.isPlaying = isPlaying;
+  const mouthRow = document.getElementById('mouthChannelsRow');
   if (isPlaying) {
     btnListen.classList.add('pressed', 'is-lit');
+    if (mouthRow) mouthRow.classList.add('mouth-talking');
     showStatus('Reproduciendo mensaje de la familia...', '🔊');
     if (listenEmoji) listenEmoji.textContent = '🔊';
     if (unreadBadgeText) unreadBadgeText.textContent = 'Reproduciendo audio...';
+    setEyeGaze('down', 0);
   } else {
     btnListen.classList.remove('pressed');
+    if (mouthRow) mouthRow.classList.remove('mouth-talking');
     updateGreenLight(state.unreadCount || 0);
     showStatus('Caja lista para jugar', '✨');
+    setEyeGaze('center', 0);
   }
 }
+window.setPlayingUI = setPlayingUI;
 
 // Cargar estado inicial desde API
 async function loadStatus() {
@@ -668,7 +690,7 @@ async function startRecording() {
         const uploadData = await uploadRes.json();
 
         if (uploadData.sent) {
-          webSounds.sent.play().catch(() => {});
+          playRandomSendSound();
           showStatus('¡Audio enviado a la familia con éxito! 🎉', '✅');
         } else {
           showStatus(uploadData.error || 'No se pudo enviar. Revisa la conexión de WhatsApp o FFmpeg.', '❌');
@@ -958,6 +980,7 @@ function switchChannel(targetIndex = null) {
   playPopSound();
   updateChannelsUI();
   updateBadgesAndGreenLightFromCache();
+  setEyeGaze('gaze-down', 2200);
 
   if (btnNose) {
     btnNose.classList.add('pressed');
@@ -1141,6 +1164,226 @@ setInterval(async () => {
   }
 }, 15000);
 
+// ========================================================
+// PANTALLA DE BIENVENIDA Y DESPERTAR INTERACTIVO
+// ========================================================
+const welcomeScreen = document.getElementById('welcomeScreen');
+const btnStartGame = document.getElementById('btnStartGame');
+const faceLayout = document.querySelector('.face-layout');
+let isBoxAwake = false;
+
+function playSynthesizedWelcome() {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    // Arpegio mágico ascendente: Do4, Mi4, Sol4, Do5, Mi5, Sol5, Do6
+    const freqs = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+    freqs.forEach((freq, idx) => {
+      const startTime = now + idx * 0.085;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(0.24, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.7);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.75);
+    });
+  } catch (e) {
+    console.error('Error sintetizando bienvenida:', e);
+  }
+}
+
+function playWelcomeSound() {
+  unlockAudio();
+  if (webSounds.welcome) {
+    try {
+      webSounds.welcome.currentTime = 0;
+      webSounds.welcome.play().catch(() => playSynthesizedWelcome());
+      return;
+    } catch (e) {}
+  }
+  playSynthesizedWelcome();
+}
+
+function handleStartGame() {
+  if (isBoxAwake) return;
+  isBoxAwake = true;
+
+  // 1. Desbloquear audio del navegador (crítico para Android)
+  unlockAudio();
+
+  // 2. Reproducir sonido de despertar alegre y mágico
+  playWelcomeSound();
+
+  // 3. Animación de salida de la pantalla de bienvenida
+  if (welcomeScreen) {
+    welcomeScreen.classList.add('fade-out');
+    setTimeout(() => {
+      welcomeScreen.classList.add('hidden');
+    }, 700);
+  }
+
+  // 4. Animación de despertar de la cara (ojos estiran y abren, boca sonríe)
+  if (faceLayout) {
+    faceLayout.classList.add('face-wake-up');
+    setTimeout(() => {
+      faceLayout.classList.remove('face-wake-up');
+    }, 1400);
+  }
+}
+
+if (btnStartGame) {
+  btnStartGame.addEventListener('click', (e) => {
+    e.stopPropagation();
+    handleStartGame();
+  });
+  btnStartGame.addEventListener('touchstart', (e) => {
+    e.stopPropagation();
+    handleStartGame();
+  }, { passive: true });
+}
+
+if (welcomeScreen) {
+  welcomeScreen.addEventListener('click', () => handleStartGame());
+  welcomeScreen.addEventListener('touchstart', () => handleStartGame(), { passive: true });
+}
+
+// ========================================================
+// MEJORAS INTERACTIVAS: COSQUILLAS, MIRADA, SIESTA Y ENVÍOS
+// ========================================================
+
+// 1. Cosquillas en la Nariz (Tickle & Giggle)
+function triggerNoseTickle() {
+  if (webSounds.giggle) {
+    try {
+      webSounds.giggle.currentTime = 0;
+      webSounds.giggle.play().catch(() => {});
+    } catch (e) {}
+  }
+  if (faceLayout) {
+    faceLayout.classList.add('face-tickled');
+    setTimeout(() => {
+      faceLayout.classList.remove('face-tickled');
+    }, 700);
+  }
+}
+
+// 2. Pupilas Curiosas Interactivas (Interactive Gaze)
+let gazeTimer = null;
+function setEyeGaze(direction, durationMs = 2200) {
+  if (!faceLayout) return;
+  if (gazeTimer) {
+    clearTimeout(gazeTimer);
+    gazeTimer = null;
+  }
+  faceLayout.classList.remove('gaze-down', 'gaze-left', 'gaze-right', 'gaze-toward-red', 'gaze-center');
+  if (direction && direction !== 'center') {
+    faceLayout.classList.add(direction);
+  }
+  if (durationMs > 0) {
+    gazeTimer = setTimeout(() => {
+      if (faceLayout) {
+        faceLayout.classList.remove('gaze-down', 'gaze-left', 'gaze-right', 'gaze-toward-red');
+      }
+    }, durationMs);
+  }
+}
+
+// Curiosidad ambiental de los ojos (miran a los lados si nadie toca)
+setInterval(() => {
+  if (isAsleep || state.isRecording || state.isPlaying || !isBoxAwake) return;
+  if (Date.now() - lastUserActivityTime > 12000) {
+    const randomDir = Math.random() > 0.5 ? 'gaze-left' : 'gaze-right';
+    setEyeGaze(randomDir, 1400);
+  }
+}, 14000);
+
+// 3. Sonidos de Envío Aleatorios Sorpresa
+function playRandomSendSound() {
+  const sendSounds = [
+    webSounds.sent,        // Cohete tradicional
+    webSounds.sentWhistle, // Silbato alegre
+    webSounds.sentPop,     // Pop mágico
+    webSounds.sentYupi     // Yupi festivo
+  ].filter(Boolean);
+
+  const chosen = sendSounds[Math.floor(Math.random() * sendSounds.length)];
+  if (chosen) {
+    try {
+      chosen.currentTime = 0;
+      chosen.play().catch(() => {});
+    } catch (e) {}
+  }
+}
+
+// 4. Modo Siesta / Ronquido por Inactividad (Sleep Mode)
+let isAsleep = false;
+let lastUserActivityTime = Date.now();
+const sleepZzzContainer = document.getElementById('sleepZzzContainer');
+const appContainer = document.querySelector('.app-container');
+
+function resetInactivityTimer() {
+  lastUserActivityTime = Date.now();
+  if (isAsleep) {
+    wakeUpFromSleep();
+  }
+}
+
+function enterSleepMode() {
+  if (isAsleep || state.isRecording || state.isPlaying || !isBoxAwake) return;
+  // Solo dormir si no hay audios nuevos pendientes
+  if ((state.unreadCount || 0) > 0) return;
+
+  isAsleep = true;
+  if (appContainer) appContainer.classList.add('is-asleep');
+  if (sleepZzzContainer) sleepZzzContainer.classList.remove('hidden');
+}
+
+function wakeUpFromSleep() {
+  if (!isAsleep) return;
+  isAsleep = false;
+  if (appContainer) appContainer.classList.remove('is-asleep');
+  if (sleepZzzContainer) sleepZzzContainer.classList.add('hidden');
+
+  // Sonido tierno de despertar / bostezo
+  if (webSounds.yawn) {
+    try {
+      webSounds.yawn.currentTime = 0;
+      webSounds.yawn.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  // Pequeño despertar elástico
+  if (faceLayout) {
+    faceLayout.classList.add('face-wake-up');
+    setTimeout(() => {
+      faceLayout.classList.remove('face-wake-up');
+    }, 1000);
+  }
+}
+
+// Comprobar inactividad cada 10s (duerme a los 3 minutos = 180s)
+setInterval(() => {
+  if (!isAsleep && isBoxAwake) {
+    if (Date.now() - lastUserActivityTime >= 180000) {
+      enterSleepMode();
+    }
+  }
+}, 10000);
+
+// Detectar cualquier toque en la pantalla para reiniciar el reloj de inactividad
+window.addEventListener('touchstart', resetInactivityTimer, { passive: true });
+window.addEventListener('mousedown', resetInactivityTimer, { passive: true });
+window.addEventListener('keydown', resetInactivityTimer, { passive: true });
+
 // Inicialización
 connectWebSocket();
 loadStatus();
+

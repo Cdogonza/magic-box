@@ -142,9 +142,155 @@ function generateEmpty() {
   return createWavBuffer(SAMPLE_RATE, samples);
 }
 
+// 5. Welcome (Despertar de la caja mágica) - Arpegio ascendente brillante y mágico
+function generateWelcome() {
+  const duration = 1.4;
+  const totalSamples = Math.floor(SAMPLE_RATE * duration);
+  const samples = new Float32Array(totalSamples);
+  // Arpegio brillante: Do4, Mi4, Sol4, Do5, Mi5, Sol5, Do6
+  const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+  const step = 0.09;
+
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / SAMPLE_RATE;
+    let s = 0;
+    notes.forEach((freq, idx) => {
+      const noteStart = idx * step;
+      if (t >= noteStart) {
+        const dt = t - noteStart;
+        // Envolvente tipo campanilla con armónicos de cristal
+        const env = Math.exp(-dt * 5.5);
+        s += Math.sin(2 * Math.PI * freq * dt) * env * 0.28;
+        s += Math.sin(2 * Math.PI * freq * 2 * dt) * env * 0.12; // Octava superior
+        s += Math.sin(2 * Math.PI * freq * 3 * dt) * env * 0.04; // Timbre metálico
+      }
+    });
+    samples[i] = s;
+  }
+  return createWavBuffer(SAMPLE_RATE, samples);
+}
+
+// 6. Giggle (Cosquillas en la nariz) - Risita alegre de caricatura
+function generateGiggle() {
+  const duration = 0.75;
+  const totalSamples = Math.floor(SAMPLE_RATE * duration);
+  const samples = new Float32Array(totalSamples);
+  // Tres impulsos de risita: 0.0s, 0.22s, 0.44s
+  const bursts = [
+    { start: 0.00, freq: 880 },
+    { start: 0.22, freq: 988 },
+    { start: 0.44, freq: 1174 }
+  ];
+
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / SAMPLE_RATE;
+    let s = 0;
+    bursts.forEach(b => {
+      if (t >= b.start && t < b.start + 0.18) {
+        const dt = t - b.start;
+        const vibrato = Math.sin(2 * Math.PI * 18 * dt) * 35;
+        const env = Math.sin((dt / 0.18) * Math.PI);
+        s += Math.sin(2 * Math.PI * (b.freq + vibrato) * dt) * env * 0.38;
+      }
+    });
+    samples[i] = s;
+  }
+  return createWavBuffer(SAMPLE_RATE, samples);
+}
+
+// 7. Yawn (Bostezo tierno de siesta / despertar)
+function generateYawn() {
+  const duration = 1.1;
+  const totalSamples = Math.floor(SAMPLE_RATE * duration);
+  const samples = new Float32Array(totalSamples);
+
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / SAMPLE_RATE;
+    // Curva de frecuencia: sube suavemente de 400Hz a 580Hz y baja a 320Hz
+    const p = t / duration;
+    const freq = 400 + Math.sin(p * Math.PI) * 180;
+    const env = Math.sin(p * Math.PI) * 0.35;
+    // Tono suave con armónicos cálidos
+    samples[i] = (Math.sin(2 * Math.PI * freq * t) * 0.7 + Math.sin(2 * Math.PI * (freq * 0.5) * t) * 0.3) * env;
+  }
+  return createWavBuffer(SAMPLE_RATE, samples);
+}
+
+// 8. Envíos aleatorios sorpresa
+// A) Silbato alegre
+function generateWhistle() {
+  const duration = 0.5;
+  const totalSamples = Math.floor(SAMPLE_RATE * duration);
+  const samples = new Float32Array(totalSamples);
+
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / SAMPLE_RATE;
+    const freq = 600 + (t / duration) * 800; // Sube de 600 a 1400Hz
+    const env = Math.sin((t / duration) * Math.PI) * 0.35;
+    samples[i] = Math.sin(2 * Math.PI * freq * t) * env;
+  }
+  return createWavBuffer(SAMPLE_RATE, samples);
+}
+
+// B) Pop Mágico de chispitas
+function generateMagicPop() {
+  const duration = 0.6;
+  const totalSamples = Math.floor(SAMPLE_RATE * duration);
+  const samples = new Float32Array(totalSamples);
+  const notes = [659.25, 880.0, 1174.66, 1567.98];
+
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / SAMPLE_RATE;
+    let s = 0;
+    notes.forEach((freq, idx) => {
+      const start = idx * 0.08;
+      if (t >= start) {
+        const dt = t - start;
+        const env = Math.exp(-dt * 12);
+        s += Math.sin(2 * Math.PI * freq * dt) * env * 0.28;
+      }
+    });
+    samples[i] = s;
+  }
+  return createWavBuffer(SAMPLE_RATE, samples);
+}
+
+// C) Yupi alegre
+function generateYupi() {
+  const duration = 0.65;
+  const totalSamples = Math.floor(SAMPLE_RATE * duration);
+  const samples = new Float32Array(totalSamples);
+  // Dos acordes festivos
+  const chord1 = [523.25, 659.25, 783.99]; // Do Mayor
+  const chord2 = [587.33, 739.99, 880.00]; // Re Mayor arriba
+
+  for (let i = 0; i < totalSamples; i++) {
+    const t = i / SAMPLE_RATE;
+    let s = 0;
+    if (t < 0.25) {
+      const env = Math.exp(-t * 6);
+      chord1.forEach(f => s += Math.sin(2 * Math.PI * f * t) * env * 0.15);
+    } else {
+      const dt = t - 0.22;
+      const env = Math.exp(-dt * 5);
+      chord2.forEach(f => s += Math.sin(2 * Math.PI * f * dt) * env * 0.2);
+    }
+    samples[i] = s;
+  }
+  return createWavBuffer(SAMPLE_RATE, samples);
+}
+
 fs.writeFileSync(path.join(soundsDir, 'ding.wav'), generateDingDong());
 fs.writeFileSync(path.join(soundsDir, 'beep.wav'), generateBeep());
 fs.writeFileSync(path.join(soundsDir, 'sent.wav'), generateSent());
 fs.writeFileSync(path.join(soundsDir, 'empty.wav'), generateEmpty());
+fs.writeFileSync(path.join(soundsDir, 'welcome.wav'), generateWelcome());
+fs.writeFileSync(path.join(soundsDir, 'giggle.wav'), generateGiggle());
+fs.writeFileSync(path.join(soundsDir, 'yawn.wav'), generateYawn());
+fs.writeFileSync(path.join(soundsDir, 'sent_whistle.wav'), generateWhistle());
+fs.writeFileSync(path.join(soundsDir, 'sent_pop.wav'), generateMagicPop());
+fs.writeFileSync(path.join(soundsDir, 'sent_yupi.wav'), generateYupi());
 
-console.log('✓ Archivos de sonido WAV generados exitosamente en ./sounds/');
+console.log('✓ Archivos de sonido WAV interactivos generados exitosamente en ./sounds/');
+
+

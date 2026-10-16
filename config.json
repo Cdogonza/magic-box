@@ -1,6 +1,6 @@
 {
-  "targetGroupName": "prueba",
-  "targetGroupId": "120363413367941258@g.us",
+  "targetGroupName": "Ranura 1",
+  "targetGroupId": "120363429365052739@g.us",
   "buttonMode": "toggle",
   "minRecordDurationSeconds": 1.2,
   "autoPlayNewMessages": false,
@@ -8,18 +8,18 @@
   "volume": 100,
   "channels": [
     {
-      "id": "120363413367941258@g.us",
-      "name": "prueba",
+      "id": "120363429365052739@g.us",
+      "name": "Ranura 1",
       "avatar": "/avatars/family1.svg"
     },
     {
       "id": "",
-      "name": "Abuelos Paternos",
+      "name": "Ranura 2",
       "avatar": "/avatars/family2.svg"
     },
     {
       "id": "",
-      "name": "Abuelos Maternos",
+      "name": "Ranura 3",
       "avatar": "/avatars/family3.svg"
     }
   ],
