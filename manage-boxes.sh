@@ -12,6 +12,33 @@ IMAGE_NAME="magic-box:latest"
 
 mkdir -p "$CLIENTS_DIR"
 
+function check_docker() {
+  if ! command -v docker &> /dev/null; then
+    echo "❌ Error: Docker no está instalado en tu servidor."
+    echo ""
+    echo "💡 Puedes instalarlo automáticamente en 1 minuto ejecutando:"
+    echo "   ./manage-boxes.sh install-docker"
+    echo ""
+    echo "O directamente con el instalador oficial:"
+    echo "   curl -fsSL https://get.docker.com | sh"
+    echo "   systemctl enable --now docker"
+    echo ""
+    exit 1
+  fi
+}
+
+function install_docker() {
+  echo "🚀 Instalando Docker de forma oficial y automática..."
+  if ! command -v curl &> /dev/null; then
+    echo "Instalando curl..."
+    apt-get update && apt-get install -y curl
+  fi
+  curl -fsSL https://get.docker.com | sh
+  systemctl enable --now docker || true
+  echo "✅ Docker instalado y listo:"
+  docker --version
+}
+
 function show_help() {
   echo "=========================================================="
   echo "🎙️  GESTOR DE INSTANCIAS CAJA MÁGICA (MULTI-CLIENTE)"
@@ -19,6 +46,7 @@ function show_help() {
   echo "Uso: ./manage-boxes.sh [comando] [argumentos]"
   echo ""
   echo "Comandos disponibles:"
+  echo "  install-docker             Instala Docker y lo arranca automáticamente"
   echo "  build                      Construir o actualizar la imagen Docker base"
   echo "  add <cliente> <puerto>     Crear e iniciar una nueva caja para un cliente"
   echo "                             Ej: ./manage-boxes.sh add garcia 3001"
@@ -33,6 +61,7 @@ function show_help() {
 }
 
 function build_image() {
+  check_docker
   echo "🔨 Construyendo imagen Docker: $IMAGE_NAME..."
   docker build -t "$IMAGE_NAME" "$BASE_DIR"
   echo "✅ Imagen construida con éxito."
@@ -178,31 +207,43 @@ function remove_client() {
 }
 
 case "$1" in
+  install-docker)
+    install_docker
+    ;;
   build)
+    check_docker
     build_image
     ;;
   add)
+    check_docker
     add_client "$2" "$3"
     ;;
   list)
+    check_docker
     list_clients
     ;;
   logs)
+    check_docker
     logs_client "$2"
     ;;
   restart)
+    check_docker
     restart_client "$2"
     ;;
   stop)
+    check_docker
     stop_client "$2"
     ;;
   start)
+    check_docker
     start_client "$2"
     ;;
   backup)
+    check_docker
     backup_client "$2"
     ;;
   remove)
+    check_docker
     remove_client "$2"
     ;;
   *)
