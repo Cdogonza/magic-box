@@ -1,0 +1,16 @@
+services:
+  # Instancia Base / Ejemplo
+  caja-demo:
+    build: .
+    image: magic-box:latest
+    container_name: caja-demo
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./clients/demo/auth:/app/auth_info_baileys
+      - ./clients/demo/data:/app/data
+      - ./clients/demo/config.json:/app/config.json
+    environment:
+      - PORT=3000
+      - NODE_ENV=production

@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+auth_info_baileys
+data/received/*
+data/recordings/*
+!data/received/.gitkeep
+!data/recordings/.gitkeep
+logs
+.git
+.gitignore
+.tempmediaStorage
+scratch
+clients
+.DS_Store
