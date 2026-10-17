@@ -434,10 +434,12 @@ async function loadAudios() {
   }
 }
 
-// AudioContext para desbloqueo móvil y fallback de decodificación
+// AudioContext para desbloqueo móvil y decodificación ultra-robusta
 let audioCtx = null;
 let currentWebAudioSource = null;
+let currentAudioAbortController = null;
 let playbackWatchdog = null;
+let playbackSessionId = 0;
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -457,10 +459,21 @@ function unlockAudio() {
 }
 
 function stopCurrentPlayback() {
+  // Invalidar cualquier sesión anterior para evitar reproducciones solapadas
+  playbackSessionId++;
+
   if (playbackWatchdog) {
     clearTimeout(playbackWatchdog);
     playbackWatchdog = null;
   }
+
+  // Cancelar peticiones de red activas de audio en vuelo
+  if (currentAudioAbortController) {
+    try { currentAudioAbortController.abort(); } catch (e) {}
+    currentAudioAbortController = null;
+  }
+
+  // Detener reproductor HTML5
   if (currentAudioPlayer) {
     try {
       currentAudioPlayer.pause();
@@ -469,27 +482,41 @@ function stopCurrentPlayback() {
     } catch (e) {}
     currentAudioPlayer = null;
   }
+
+  // Detener nodo Web Audio
   if (currentWebAudioSource) {
     try {
       currentWebAudioSource.stop();
+      currentWebAudioSource.disconnect();
     } catch (e) {}
     currentWebAudioSource = null;
+  }
+
+  setPlayingUI(false);
+  if (currentUIState === UIState.PLAYING) {
+    currentUIState = UIState.IDLE;
   }
 }
 
 // Reproducción alternativa mediante Web Audio API si HTML5 Audio se cuelga con Opus/Ogg
-async function playWithWebAudio(audioUrl, onEnded) {
+async function playWithWebAudio(audioUrl, sessionId, signal, onEnded) {
   const ctx = getAudioContext();
   if (!ctx) return false;
 
   try {
     if (ctx.state === 'suspended') await ctx.resume();
-    showStatus('Decodificando audio...', '🔊');
+    if (playbackSessionId !== sessionId || signal?.aborted) return false;
 
-    const res = await fetch(audioUrl);
-    if (!res.ok) return false;
+    showStatus('Cargando mensaje de voz...', '🔊');
+
+    const res = await fetch(audioUrl, { signal });
+    if (!res.ok || playbackSessionId !== sessionId || signal?.aborted) return false;
+
     const arrayBuf = await res.arrayBuffer();
+    if (playbackSessionId !== sessionId || signal?.aborted) return false;
+
     const audioBuf = await ctx.decodeAudioData(arrayBuf);
+    if (playbackSessionId !== sessionId || signal?.aborted) return false;
 
     const source = ctx.createBufferSource();
     source.buffer = audioBuf;
@@ -497,76 +524,96 @@ async function playWithWebAudio(audioUrl, onEnded) {
     currentWebAudioSource = source;
 
     source.onended = () => {
-      currentWebAudioSource = null;
-      if (onEnded) onEnded();
+      if (currentWebAudioSource === source) {
+        currentWebAudioSource = null;
+      }
+      if (playbackSessionId === sessionId) {
+        if (onEnded) onEnded();
+      }
     };
 
     source.start(0);
+    showStatus('Reproduciendo mensaje de la familia...', '🔊');
     return true;
   } catch (err) {
+    if (err.name === 'AbortError') return false;
     console.error('[WebAudio] Fallback falló:', err);
     return false;
   }
 }
 
-// Reproducir audio completo sin cortes en el navegador
+// Reproducir audio completo sin cortes en el navegador, garantizando UNA SOLA reproducción a la vez
 async function playAudioFile(audioUrl) {
+  // Asegurar que el micrófono esté completamente apagado para que no bloquee el audio de salida en Android
+  releaseMicrophone();
+
+  // Detener inmediatamente cualquier audio previo
   stopCurrentPlayback();
+
+  // Generar ID de sesión único
+  playbackSessionId++;
+  const thisSession = playbackSessionId;
+  const abortCtrl = new AbortController();
+  currentAudioAbortController = abortCtrl;
+
+  currentUIState = UIState.PLAYING;
   setPlayingUI(true);
 
   // Watchdog de seguridad absoluto: Si en 25s no terminó, liberar la interfaz
   playbackWatchdog = setTimeout(() => {
-    console.warn('[Audio] Watchdog: Tiempo límite alcanzado, restaurando UI.');
-    stopCurrentPlayback();
-    setPlayingUI(false);
+    if (playbackSessionId === thisSession) {
+      console.warn('[Audio] Watchdog: Tiempo límite alcanzado, restaurando UI.');
+      stopCurrentPlayback();
+    }
   }, 25000);
 
-  let finished = false;
   const finish = () => {
-    if (finished) return;
-    finished = true;
+    if (playbackSessionId !== thisSession) return;
     stopCurrentPlayback();
-    setPlayingUI(false);
     loadAudios();
   };
 
-  const audio = new Audio();
-  currentAudioPlayer = audio;
-  audio.preload = 'auto';
+  unlockAudio();
 
-  audio.onended = () => {
-    finish();
-  };
-
-  audio.onloadedmetadata = () => {
-    if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-      clearTimeout(playbackWatchdog);
-      const safeTime = Math.max(5000, (audio.duration + 4) * 1000);
-      playbackWatchdog = setTimeout(() => {
-        console.warn('[Audio] Watchdog: Duración superada.');
-        finish();
-      }, safeTime);
-    }
-  };
-
-  audio.onerror = async (err) => {
-    console.warn('[Audio] HTML5 Audio falló, probando fallback Web Audio:', err);
-    const ok = await playWithWebAudio(audioUrl, finish);
-    if (!ok) {
-      showStatus('No se pudo reproducir este audio', '⚠️');
-      finish();
-    }
-  };
-
-  audio.src = audioUrl;
-
+  let html5Started = false;
   try {
+    const audio = new Audio();
+    currentAudioPlayer = audio;
+    audio.preload = 'auto';
+
+    audio.onended = () => {
+      if (playbackSessionId === thisSession) {
+        finish();
+      }
+    };
+
+    audio.onloadedmetadata = () => {
+      if (playbackSessionId !== thisSession) return;
+      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
+        clearTimeout(playbackWatchdog);
+        const safeTime = Math.max(5000, (audio.duration + 3) * 1000);
+        playbackWatchdog = setTimeout(() => {
+          if (playbackSessionId === thisSession) finish();
+        }, safeTime);
+      }
+    };
+
+    audio.src = audioUrl;
     await audio.play();
+    if (playbackSessionId !== thisSession) {
+      try { audio.pause(); } catch (e) {}
+      return;
+    }
+    html5Started = true;
   } catch (playErr) {
-    console.warn('[Audio] .play() bloqueado o falló, probando fallback Web Audio:', playErr);
-    const ok = await playWithWebAudio(audioUrl, finish);
-    if (!ok) {
-      showStatus('Error de reproducción en el navegador', '⚠️');
+    console.warn('[Audio] HTML5 Audio play falló o fue bloqueado, probando Web Audio:', playErr.message);
+  }
+
+  // Si HTML5 Audio no pudo iniciar (por formato .ogg en Safari o bloqueo de Android), usar Web Audio
+  if (!html5Started && playbackSessionId === thisSession) {
+    const ok = await playWithWebAudio(audioUrl, thisSession, abortCtrl.signal, finish);
+    if (!ok && playbackSessionId === thisSession) {
+      showStatus('No se pudo reproducir este audio', '⚠️');
       finish();
     }
   }
@@ -576,7 +623,18 @@ async function playAudioFile(audioUrl) {
 // ACCIÓN BOTÓN VERDE: ESCUCHAR
 // ==========================================
 async function handleListenAction() {
-  if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
+  // Si ya está reproduciendo, tocar el botón verde detiene la reproducción (Toggle limpio)
+  if (currentUIState === UIState.PLAYING) {
+    stopCurrentPlayback();
+    showStatus('Reproducción detenida', '⏹️');
+    return;
+  }
+
+  if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) {
+    showStatus('Espera un momento, la caja está ocupada', '⏳');
+    return;
+  }
+
   if (isActionDebounced()) return;
   currentUIState = UIState.PLAYING;
 
@@ -592,6 +650,12 @@ async function handleListenAction() {
     });
     const data = await res.json();
 
+    // Sincronizar si el servidor redirigió al canal que tenía mensajes nuevos
+    if (data.activeChannelIndex !== undefined && data.activeChannelIndex !== state.activeChannelIndex) {
+      state.activeChannelIndex = data.activeChannelIndex;
+      updateChannelsUI();
+    }
+
     if (data.played && data.played.url) {
       if (data.unreadCount !== undefined) {
         state.unreadCount = data.unreadCount;
@@ -599,40 +663,51 @@ async function handleListenAction() {
       await playAudioFile(data.played.url);
     } else {
       btnListen.classList.remove('pressed');
+      currentUIState = UIState.IDLE;
       webSounds.empty.play().catch(() => {});
       showStatus('No hay mensajes nuevos en la caja', '📭');
     }
   } catch (e) {
     console.error('Error al escuchar:', e);
     btnListen.classList.remove('pressed');
-    setPlayingUI(false);
-    showStatus('Error de conexión', '❌');
-  } finally {
-    if (currentUIState === UIState.PLAYING) {
-      currentUIState = UIState.IDLE;
-    }
+    stopCurrentPlayback();
+    showStatus('Error de conexión al buscar audios', '❌');
   }
 }
 
 // ==========================================
 // ACCIÓN BOTÓN ROJO: GRABAR Y ENVIAR
 // ==========================================
-async function initMicrophone() {
-  if (!micStream) {
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
+function releaseMicrophone() {
+  if (micStream) {
+    try {
+      micStream.getTracks().forEach(track => {
+        try { track.stop(); } catch (e) {}
+      });
+    } catch (e) {}
+    micStream = null;
   }
+}
+
+async function initMicrophone() {
+  releaseMicrophone();
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true
+    }
+  });
   return micStream;
 }
 
 async function startRecording() {
   if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
   if (isActionDebounced()) return;
+
+  // Detener inmediatamente cualquier audio previo antes de grabar
+  stopCurrentPlayback();
+
   currentUIState = UIState.RECORDING;
 
   try {
@@ -660,6 +735,9 @@ async function startRecording() {
       const duration = (Date.now() - recordStartTime) / 1000;
       setRecordingUI(false);
 
+      // LIBERACIÓN INMEDIATA DEL MICRÓFONO PARA DEVOLVER EL CONTROL Y FOCO DE AUDIO AL SISTEMA ANDROID
+      releaseMicrophone();
+
       if (duration < 1.0) {
         currentUIState = UIState.IDLE;
         showStatus('Audio muy cortito, descartado', '⚠️');
@@ -669,17 +747,17 @@ async function startRecording() {
       currentUIState = UIState.SENDING;
       showStatus('Enviando audio al grupo...', '🚀');
 
-      // Watchdog de envío (8s): libera la interfaz si el envío por red se traba
+      // Watchdog de envío (6s): libera la interfaz si el envío por red se traba
       clearTimeout(sendingWatchdogTimer);
       sendingWatchdogTimer = setTimeout(() => {
         if (currentUIState === UIState.SENDING) {
-          console.warn('[Watchdog] Envío tardó más de 8s, liberando UI.');
+          console.warn('[Watchdog] Envío tardó más de 6s, liberando UI.');
           currentUIState = UIState.IDLE;
           setRecordingUI(false);
         }
-      }, 8000);
+      }, 6000);
 
-      const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      const blob = new Blob(audioChunks, { type: mediaRecorder?.mimeType || 'audio/webm' });
 
       try {
         const uploadRes = await fetch('/api/upload-voice', {
@@ -693,7 +771,7 @@ async function startRecording() {
           playRandomSendSound();
           showStatus('¡Audio enviado a la familia con éxito! 🎉', '✅');
         } else {
-          showStatus(uploadData.error || 'No se pudo enviar. Revisa la conexión de WhatsApp o FFmpeg.', '❌');
+          showStatus(uploadData.error || 'No se pudo enviar el audio.', '❌');
         }
       } catch (err) {
         console.error('Error subiendo audio:', err);
@@ -720,7 +798,8 @@ async function startRecording() {
     }, 30000);
 
   } catch (err) {
-    console.error('Permiso de micrófono denegado:', err);
+    console.error('Permiso de micrófono denegado o error:', err);
+    releaseMicrophone();
     currentUIState = UIState.IDLE;
     setRecordingUI(false);
     alert('Por favor permite el acceso al micrófono en el navegador para poder grabar.');
@@ -730,7 +809,11 @@ async function startRecording() {
 function stopRecording() {
   clearTimeout(recordingWatchdogTimer);
   if (mediaRecorder && mediaRecorder.state === 'recording') {
-    mediaRecorder.stop();
+    try {
+      mediaRecorder.stop();
+    } catch (e) {}
+  } else {
+    releaseMicrophone();
   }
 }
 
@@ -1136,7 +1219,18 @@ mouthCards.forEach((card, idx) => {
     bindFastTap(card, () => {
       if (currentUIState === UIState.RECORDING || currentUIState === UIState.SENDING) return;
       if (isActionDebounced()) return;
+
+      const hasUnread = card.classList.contains('has-unread') || 
+                        (mouthBadges[idx] && !mouthBadges[idx].classList.contains('hidden'));
+
       switchChannel(idx);
+
+      // Si el grupo tocado tiene la campanita (mensaje nuevo), ¡reproducir inmediatamente!
+      if (hasUnread) {
+        setTimeout(() => {
+          handleListenAction();
+        }, 150);
+      }
     });
   }
 });

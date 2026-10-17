@@ -74,7 +74,16 @@ app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/sounds', express.static(path.join(__dirname, 'sounds')));
-app.use('/audio-received', express.static(path.join(__dirname, 'data', 'received')));
+app.use('/audio-received', express.static(path.join(__dirname, 'data', 'received'), {
+  setHeaders: (res, filePath) => {
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (filePath.endsWith('.ogg')) {
+      res.setHeader('Content-Type', 'audio/ogg');
+    } else if (filePath.endsWith('.mp3')) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+    }
+  }
+}));
 
 const avatarsStorageDir = path.join(__dirname, 'data', 'avatars');
 if (!fs.existsSync(avatarsStorageDir)) fs.mkdirSync(avatarsStorageDir, { recursive: true });
@@ -248,8 +257,19 @@ app.post('/api/btn/listen', async (req, res) => {
     const played = await audio.playNextOrLast(isWeb, targetChannel);
     const audios = audio.getReceivedAudios();
     const unreadCount = audios.filter(a => !a.isRead).length;
+
+    // Si el audio reproducido proviene de otro canal (por redirección a un mensaje no leído), sincronizar el canal activo
+    if (played && typeof played.channelIndex === 'number' && played.channelIndex !== config.activeChannelIndex) {
+      config.activeChannelIndex = played.channelIndex;
+      fs.writeFile(configFile, JSON.stringify(config, null, 2), () => {});
+      broadcast('channel-switch', {
+        activeChannelIndex: played.channelIndex,
+        activeChannel: config.channels[played.channelIndex]
+      });
+    }
+
     broadcast('unread-update', { unreadCount });
-    res.json({ success: true, played, unreadCount });
+    res.json({ success: true, played, unreadCount, activeChannelIndex: config.activeChannelIndex });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
